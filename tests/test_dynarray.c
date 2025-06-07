@@ -54,7 +54,7 @@ int test_empty() {
     return 0;
 }
 
-int test_resize_insert() {
+int test_resize_set() {
     dynarray arr;
     int32_t src[] = {1, 2, 3, 4, 45, 1, 568};
     pml_err_t err = PML_OK;
@@ -66,7 +66,7 @@ int test_resize_insert() {
     printf("Array:\n");
     arr.print(&arr);
     int new_value = 50;
-    result_t res = arr.insert_at(&arr, 7, &new_value);
+    result_t res = arr.set_at(&arr, 7, &new_value);
     if (res.err != PML_OUT_OF_BOUNDS) {
         printf("insert_at: Error code: %d, must be %d\n", res.err, PML_OUT_OF_BOUNDS);
         return 1;
@@ -81,7 +81,7 @@ int test_resize_insert() {
         return 1;
     }
     new_value = 469;
-    res = arr.insert_at(&arr, 7, &new_value);
+    res = arr.set_at(&arr, 7, &new_value);
     if (res.err != PML_OK) {
         printf("insert_at: Error code: %d, must be %d\n", res.err, PML_OK);
         return 1;
@@ -115,7 +115,7 @@ int main(){
     if (ret != 0) {
         return 1;
     }
-    ret = test_resize_insert();
+    ret = test_resize_set();
     if (ret != 0) {
         return 1;
     }

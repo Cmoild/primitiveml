@@ -8,7 +8,7 @@ static void dynarray_print(const dynarray* self);
 
 static result_t dynarray_get_at(const dynarray* self, const size_t idx);
 
-static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void* value);
+static result_t dynarray_set_at(dynarray* self, const size_t idx, const void* value);
 
 static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity);
 
@@ -16,7 +16,7 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
     dynarray vector = {
         .get_at = dynarray_get_at,
         .print = dynarray_print,
-        .insert_at = dynarray_insert_at,
+        .set_at = dynarray_set_at,
         .resize = dynarray_resize,
     };
     switch (type) {
@@ -144,7 +144,7 @@ static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity) {
     return PML_OK;
 }
 
-static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void* value) {
+static result_t dynarray_set_at(dynarray* self, const size_t idx, const void* value) {
     result_t res;
     if (idx > self->_size || idx < 0 || idx >= self->_capacity) {
         res.err = PML_OUT_OF_BOUNDS;
