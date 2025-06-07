@@ -8,10 +8,16 @@ static void dynarray_print(const dynarray* self);
 
 static result_t dynarray_get_at(const dynarray* self, const size_t idx);
 
+static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void* value);
+
+static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity);
+
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error) {
     dynarray vector = {
         .get_at = dynarray_get_at,
         .print = dynarray_print,
+        .insert_at = dynarray_insert_at,
+        .resize = dynarray_resize,
     };
     switch (type) {
     case TYPE_INT32:
@@ -41,6 +47,7 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
         break;
     default:
         *error = PML_WRONG_TYPE;
+        printf("Type is not supported\n");
         break;
     }
     return vector;
@@ -57,6 +64,7 @@ static void dynarray_print(const dynarray* self) {
         fmt = "%f ";
         break;
     default:
+        printf("Type is not supported\n");
         return;
         break;
     }
@@ -94,8 +102,75 @@ static result_t dynarray_get_at(const dynarray* self, const size_t idx) {
         res.err = PML_OK;
         break;
     default:
+        printf("Type is not supported\n");
         res.err = PML_WRONG_TYPE;
         break;
+    }
+    return res;
+}
+
+static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity) {
+    void* tmp;
+    switch (self->type)
+    {
+    case TYPE_INT32:
+        tmp = realloc(self->_container, new_capacity * sizeof(int32_t));
+        if (tmp != NULL) {
+            self->_container = tmp;
+            self->_capacity = new_capacity;
+        }
+        else {
+            return PML_OUT_OF_MEMORY;
+        }
+        break;
+    case TYPE_FLOAT:
+        tmp = realloc(self->_container, new_capacity * sizeof(float));
+        if (tmp != NULL) {
+            self->_container = tmp;
+            self->_capacity = new_capacity;
+        }
+        else {
+            return PML_OUT_OF_MEMORY;
+        }
+        break;
+    default:
+        printf("Type is not supported\n");
+        return PML_WRONG_TYPE;
+        break;
+    }
+    if (new_capacity < self->_size) {
+        self->_size = new_capacity;
+    }
+    return PML_OK;
+}
+
+static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void* value) {
+    result_t res;
+    if (idx > self->_size || idx < 0 || idx >= self->_capacity) {
+        res.err = PML_OUT_OF_BOUNDS;
+        return res;
+    }
+    switch (self->type)
+    {
+    case TYPE_INT32:
+        res.type = TYPE_INT32;
+        res.val.i = *((int32_t*)value);
+        *((int32_t*)self->_container + idx) = res.val.i;
+        res.err = PML_OK;
+        break;
+    case TYPE_FLOAT:
+        res.type = TYPE_FLOAT;
+        res.val.f = *((float*)value);
+        *((float*)self->_container + idx) = res.val.f;
+        res.err = PML_OK;
+        break;
+    default:
+        printf("Type is not supported\n");
+        res.err = PML_WRONG_TYPE;
+        break;
+    }
+    if (idx == self->_size) {
+        self->_size++;
     }
     return res;
 }
