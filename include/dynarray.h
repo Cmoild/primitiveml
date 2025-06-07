@@ -13,7 +13,7 @@ typedef struct dynarray {
     void (*print)(const struct dynarray* self);
     result_t (*get_at)(const struct dynarray* self, const size_t idx);
     result_t (*set_at)(struct dynarray* self, const size_t idx, const void* value);
-    pml_err_t (*resize)(struct dynarray* self, const size_t new_capacity);
+    pml_err_t (*resize)(struct dynarray* self, const size_t new_size);
 } dynarray;
 
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error);

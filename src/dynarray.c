@@ -10,7 +10,7 @@ static result_t dynarray_get_at(const dynarray* self, const size_t idx);
 
 static result_t dynarray_set_at(dynarray* self, const size_t idx, const void* value);
 
-static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity);
+static pml_err_t dynarray_resize(dynarray* self, const size_t new_size);
 
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error) {
     dynarray vector = {
@@ -109,25 +109,25 @@ static result_t dynarray_get_at(const dynarray* self, const size_t idx) {
     return res;
 }
 
-static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity) {
+static pml_err_t dynarray_resize(dynarray* self, const size_t new_size) {
     void* tmp;
     switch (self->type)
     {
     case TYPE_INT32:
-        tmp = realloc(self->_container, new_capacity * sizeof(int32_t));
+        tmp = realloc(self->_container, new_size * sizeof(int32_t));
         if (tmp != NULL) {
             self->_container = tmp;
-            self->_capacity = new_capacity;
+            self->_capacity = new_size;
         }
         else {
             return PML_OUT_OF_MEMORY;
         }
         break;
     case TYPE_FLOAT:
-        tmp = realloc(self->_container, new_capacity * sizeof(float));
+        tmp = realloc(self->_container, new_size * sizeof(float));
         if (tmp != NULL) {
             self->_container = tmp;
-            self->_capacity = new_capacity;
+            self->_capacity = new_size;
         }
         else {
             return PML_OUT_OF_MEMORY;
@@ -138,15 +138,13 @@ static pml_err_t dynarray_resize(dynarray* self, const size_t new_capacity) {
         return PML_WRONG_TYPE;
         break;
     }
-    if (new_capacity < self->_size) {
-        self->_size = new_capacity;
-    }
+    self->_size = new_size;
     return PML_OK;
 }
 
 static result_t dynarray_set_at(dynarray* self, const size_t idx, const void* value) {
     result_t res;
-    if (idx > self->_size || idx < 0 || idx >= self->_capacity) {
+    if (idx >= self->_size || idx < 0 || idx >= self->_capacity) {
         res.err = PML_OUT_OF_BOUNDS;
         return res;
     }

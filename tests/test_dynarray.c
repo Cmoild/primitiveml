@@ -76,8 +76,8 @@ int test_resize_set() {
         printf("resize: Error code: %d, must be %d\n", res.err, PML_OK);
         return 1;
     }
-    if (arr._size != 7 && arr._capacity != 8) {
-        printf("resize: wrong size or capacity, right values: (7, 8)\n");
+    if (arr._size != 8 && arr._capacity != 8) {
+        printf("resize: wrong size or capacity, right values: (8, 8)\n");
         return 1;
     }
     new_value = 469;
