@@ -10,8 +10,8 @@ typedef struct dynarray {
     size_t _capacity;
     container_type_t type;
     void *_container;
-    void (*print)(const struct dynarray*);
-    result_t (*get_at)(const struct dynarray*, const size_t);
+    void (*print)(const struct dynarray* self);
+    result_t (*get_at)(const struct dynarray* self, const size_t idx);
 } dynarray;
 
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error);

@@ -17,7 +17,7 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
     case TYPE_INT32:
         // vector._container = data;
         vector._container = malloc(sizeof(int32_t) * len);
-        if (!vector._container) {
+        if (!vector._container && len > 0) {
             *error = PML_OUT_OF_MEMORY;
             return vector;
         }
@@ -29,7 +29,7 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
         break;
     case TYPE_FLOAT:
         vector._container = malloc(sizeof(float) * len);
-        if (!vector._container) {
+        if (!vector._container && len > 0) {
             *error = PML_OUT_OF_MEMORY;
             return vector;
         }
@@ -77,7 +77,7 @@ static void dynarray_print(const dynarray* self) {
 
 static result_t dynarray_get_at(const dynarray* self, const size_t idx) {
     result_t res;
-    if (idx >= self->_size && idx < 0) {
+    if (idx >= self->_size || idx < 0) {
         res.err = PML_OUT_OF_BOUNDS;
         return res;
     }
@@ -86,10 +86,12 @@ static result_t dynarray_get_at(const dynarray* self, const size_t idx) {
     case TYPE_INT32:
         res.type = TYPE_INT32;
         res.val.i = *((int32_t*)self->_container + idx);
+        res.err = PML_OK;
         break;
     case TYPE_FLOAT:
         res.type = TYPE_FLOAT;
         res.val.f = *((float*)self->_container + idx);
+        res.err = PML_OK;
         break;
     default:
         res.err = PML_WRONG_TYPE;
