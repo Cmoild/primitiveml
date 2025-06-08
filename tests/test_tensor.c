@@ -3,7 +3,7 @@
 #include <tensor.h>
 
 
-int main(){
+int main() {
     int32_t raw_data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
     int32_t raw_shape[] = {2, 2, 3};
     pml_err_t err = PML_OK;

@@ -18,4 +18,6 @@ typedef struct dynarray {
 
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error);
 
+void dynarray_free(dynarray* obj);
+
 #endif // DYNARRAY_HEADER_FILE

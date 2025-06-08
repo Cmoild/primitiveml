@@ -53,6 +53,12 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
     return vector;
 }
 
+void dynarray_free(dynarray* obj) {
+    if (obj->_container) {
+        free(obj->_container);
+    }
+}
+
 static void dynarray_print(const dynarray* self) {
     char* fmt;
     switch (self->type)
