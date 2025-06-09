@@ -30,4 +30,14 @@ void tensor_free(tensor* obj);
 
 bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
 
+typedef struct tensor_iterator {
+    dynarray counter;
+    container_type_t type;
+    result_t (*get_next)(const struct tensor* obj);
+} tensor_iterator;
+
+tensor_iterator* tensor_iterator_create(tensor* obj);
+
+void tensor_iterator_free(tensor_iterator* obj);
+
 #endif // TENSOR_HEADER_FILE

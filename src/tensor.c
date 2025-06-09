@@ -83,38 +83,75 @@ tensor* tensor_create(
     return tnsr;
 }
 
-static void tensor_print(const tensor* self) {
-    char* fmt;
-    switch (self->type)
-    {
-    case TYPE_INT32:
-        fmt = "%i ";
-        break;
-    case TYPE_FLOAT:
-        fmt = "%f ";
-        break;
-    default:
-        printf("Type is not supported\n");
+static void print_helper(const tensor* self, size_t shape_idx, void* data) {
+    result_t dim_size = self->shape.get_at(&self->shape, shape_idx);
+    if (dim_size.err != PML_OK) {
         return;
-        break;
     }
-    printf("Data: [ ");
-    for (size_t i = 0; i < self->data_num_elems; i++) {
-        switch (self->type)
-        {
-        case TYPE_INT32:
-            printf(fmt, *((int32_t*)self->data + i));
-            break;
-        case TYPE_FLOAT:
-            printf(fmt, *((float*)self->data + i));
-            break;
+    if (shape_idx == self->shape._size - 1) {
+        printf("[ ");
+        result_t stride = self->strides.get_at(&self->strides, shape_idx);
+        if (stride.err != PML_OK) {
+            return;
         }
+        for (size_t i = 0; i < dim_size.val.i; i++) {
+            switch (self->type)
+            {
+            case TYPE_INT32:
+                int32_t ival = *((int32_t*)data + i * stride.val.i);
+                printf("%d ", ival);
+                break;
+            case TYPE_FLOAT:
+                float fval = *((float*)data + i * stride.val.i);
+                printf("%f ", fval);
+                break;
+            default:
+                printf("Type is not supported\n");
+                return;
+                break;
+            }
+        }
+        printf("]");
     }
-    printf("]\n");
+    else {
+        printf("[");
+        result_t stride = self->strides.get_at(&self->strides, shape_idx);
+        if (stride.err != PML_OK) {
+            return;
+        }
+        for (size_t i = 0; i < dim_size.val.i; i++) {
+            void* sub_data;
+            switch (self->type)
+            {
+            case TYPE_INT32:
+                sub_data = (int32_t*)data + i * stride.val.i;
+                break;
+            case TYPE_FLOAT:
+                sub_data = (float*)data + i * stride.val.i;
+                break;
+            default:
+                printf("Type is not supported\n");
+                return;
+                break;
+            }
+            print_helper(self, shape_idx + 1, sub_data);
+            if (i < dim_size.val.i - 1) {
+                printf(",\n");
+            }
+        }
+        printf("]");
+    }
+}
+
+static void tensor_print(const tensor* self) {
+    printf("Tensor: {\n");
+    print_helper(self, 0, self->data);
+    printf("\n");
     printf("Shape: ");
     self->shape.print(&self->shape);
     printf("Strides: ");
     self->strides.print(&self->strides);
+    printf("}\n");
 }
 
 void tensor_free(tensor* obj) {

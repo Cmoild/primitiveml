@@ -7,7 +7,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-add_library(pml_core src/dynarray.c src/tensor.c)
+add_library(pml_core 
+    src/dynarray.c 
+    src/tensor.c
+    src/tensor_iterator.c
+)
 
 file(GLOB MAIN_SRC_FILES ${CMAKE_SOURCE_DIR}/src/main.c)
 add_executable(primitiveml ${MAIN_SRC_FILES})
