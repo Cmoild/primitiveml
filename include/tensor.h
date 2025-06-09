@@ -5,6 +5,7 @@
 #include <error_handling.h>
 #include <container_type.h>
 #include <dynarray.h>
+#include <stdbool.h>
 
 typedef struct tensor {
 	container_type_t type;
@@ -22,6 +23,11 @@ tensor* tensor_create(
     const container_type_t type, 
     const size_t n_dimentions, 
     const dynarray shape, 
-    pml_err_t* error);
+    pml_err_t* error
+);
+
+void tensor_free(tensor* obj);
+
+bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
 
 #endif // TENSOR_HEADER_FILE

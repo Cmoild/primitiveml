@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 
 static void tensor_print(const tensor* self);
@@ -15,6 +16,10 @@ tensor* tensor_create(
     pml_err_t* error) {
     if (data_len == 0) {
         *error = PML_EMPTY_TENSOR;
+        return NULL;
+    }
+    if (!&shape) {
+        *error = PML_INCORRECT_INPUT;
         return NULL;
     }
     tensor* tnsr = (tensor*)malloc(sizeof(tensor));
@@ -110,4 +115,36 @@ static void tensor_print(const tensor* self) {
     self->shape.print(&self->shape);
     printf("Strides: ");
     self->strides.print(&self->strides);
+}
+
+void tensor_free(tensor* obj) {
+    dynarray_free(&obj->shape);
+    dynarray_free(&obj->strides);
+    if (obj->data) {
+        free(obj->data);
+    }
+}
+
+bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err) {
+    for (int i = 0; i < left->shape._size && i < right->shape._size; i++) {
+        result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
+        if (left_cur.err != PML_OK) {
+            *err = left_cur.err;
+            return 0;
+        }
+        result_t right_cur = right->shape.get_at(&right->shape, right->shape._size - 1 - i);
+        if (right_cur.err != PML_OK) {
+            *err = right_cur.err;
+            return 0;
+        }
+        if (left_cur.val.i == right_cur.val.i) {
+            continue;
+        }
+        if (left_cur.val.i == 1 || right_cur.val.i == 1) {
+            continue;
+        }
+        return 0;
+    }
+
+    return 1;
 }

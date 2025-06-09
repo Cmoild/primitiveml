@@ -20,4 +20,6 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
 
 void dynarray_free(dynarray* obj);
 
+dynarray dynarray_clone(const dynarray* obj, pml_err_t *error);
+
 #endif // DYNARRAY_HEADER_FILE

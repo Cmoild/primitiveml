@@ -59,6 +59,43 @@ void dynarray_free(dynarray* obj) {
     }
 }
 
+dynarray dynarray_clone(const dynarray* obj, pml_err_t *error) {
+    dynarray new_arr = {
+        .get_at = dynarray_get_at,
+        .print = dynarray_print,
+        .resize = dynarray_resize,
+        .set_at = dynarray_set_at,
+        .type = obj->type,
+        ._capacity = obj->_capacity,
+        ._size = obj->_size,
+    };
+    switch (obj->type) {
+    case TYPE_INT32:
+        new_arr._container = malloc(sizeof(int32_t) * obj->_capacity);
+        if (!new_arr._container && obj->_capacity > 0) {
+            *error = PML_OUT_OF_MEMORY;
+            return new_arr;
+        }
+        memcpy(new_arr._container, obj->_container, obj->_capacity * sizeof(int32_t));
+        *error = PML_OK;
+        break;
+    case TYPE_FLOAT:
+        new_arr._container = malloc(sizeof(float) * obj->_capacity);
+        if (!new_arr._container && obj->_capacity > 0) {
+            *error = PML_OUT_OF_MEMORY;
+            return new_arr;
+        }
+        memcpy(new_arr._container, obj->_container, obj->_capacity * sizeof(float));
+        *error = PML_OK;
+        break;
+    default:
+        *error = PML_WRONG_TYPE;
+        printf("Type is not supported\n");
+        break;
+    }
+    return new_arr;
+}
+
 static void dynarray_print(const dynarray* self) {
     char* fmt;
     switch (self->type)

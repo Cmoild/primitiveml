@@ -28,6 +28,9 @@ int basic_tests() {
         printf("get_at: Error code: %d\n", res.err);
         return 1;
     }
+
+    dynarray_free(&arr);
+    printf("Test Case 1 (Basic tests): PASSED\n");
     return 0;
 }
 
@@ -51,6 +54,9 @@ int test_empty() {
         printf("get_at: Error code: %d\n", res.err);
         return 1;
     }
+
+    dynarray_free(&arr);
+    printf("Test Case 2 (Tests with empty arrays): PASSED\n");
     return 0;
 }
 
@@ -103,6 +109,9 @@ int test_resize_set() {
     }
     printf("Array (resized to 4):\n");
     arr.print(&arr);
+
+    dynarray_free(&arr);
+    printf("Test Case 3 (Tests resize, set): PASSED\n");
     return 0;
 }
 
