@@ -28,6 +28,13 @@ tensor* tensor_create(
 
 tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type, pml_err_t* error);
 
+tensor* tensor_create_zeros(
+    const container_type_t type, 
+    const size_t n_dimentions, 
+    const dynarray shape, 
+    pml_err_t* error
+);
+
 void tensor_free(tensor* obj);
 
 bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);

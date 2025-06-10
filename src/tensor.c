@@ -50,7 +50,6 @@ tensor* tensor_create(
         strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
         result_t res_get = shape.get_at(&shape, (size_t)i);
         if (res_get.err != PML_OK) {
-            printf("Error (shape, res_get): %d, i: %d\n", res_get.err, i);
             *error = PML_INCORRECT_INPUT;
             dynarray_free(&strides);
             free(tnsr);
@@ -146,6 +145,91 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
         return NULL;
     }
     tnsr->shape = shape;
+    tnsr->strides = strides;
+    return tnsr;
+}
+
+tensor* tensor_create_zeros(
+    const container_type_t type, 
+    const size_t n_dimentions, 
+    const dynarray shape, 
+    pml_err_t* error) {
+    
+    if (shape._size == 0) {
+        *error = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+    tensor* tnsr = (tensor*)malloc(sizeof(tensor));
+    tnsr->type = type;
+    tnsr->shape = shape;
+    tnsr->n_dim = n_dimentions;
+
+    pml_err_t err_strides = PML_OK;
+    dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
+    if (err_strides != PML_OK) {
+        *error = err_strides;
+        dynarray_free(&strides);
+        free(tnsr);
+        return NULL;
+    }
+    if (n_dimentions != 0) {
+        err_strides = strides.resize(&strides, n_dimentions);
+        if (err_strides != PML_OK) {
+            *error = err_strides;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+    }
+    size_t n_elems = 1;
+    for (int i = n_dimentions - 1; i >= 0; i--) {
+        strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
+        result_t res_get = shape.get_at(&shape, (size_t)i);
+        if (res_get.err != PML_OK) {
+            *error = PML_INCORRECT_INPUT;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+        n_elems *= (size_t)res_get.val.i;
+    }
+    if (n_elems == 0) {
+        *error = PML_EMPTY_TENSOR;
+        dynarray_free(&strides);
+        free(tnsr);
+        return NULL;
+    }
+    switch (type) {
+    case TYPE_INT32:
+        tnsr->data = calloc(n_elems, sizeof(int32_t));
+        if (!tnsr->data) {
+            *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            dynarray_free(&strides);
+            return NULL;
+        }
+        *error = PML_OK;
+        break;
+    case TYPE_FLOAT:
+        tnsr->data = calloc(n_elems, sizeof(float));
+        if (!tnsr->data) {
+            *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            dynarray_free(&strides);
+            return NULL;
+        }
+        *error = PML_OK;
+        break;
+    default:
+        *error = PML_WRONG_TYPE;
+        free(tnsr);
+        dynarray_free(&strides);
+        printf("Type is not supported\n");
+        return NULL;
+        break;
+    }
+    tnsr->print = tensor_print;
+    tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
     return tnsr;
 }
