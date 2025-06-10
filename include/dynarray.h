@@ -22,4 +22,6 @@ void dynarray_free(dynarray* obj);
 
 dynarray dynarray_clone(const dynarray* obj, pml_err_t *error);
 
+dynarray dynarray_zeros(const size_t len, const container_type_t type, pml_err_t *error);
+
 #endif // DYNARRAY_HEADER_FILE

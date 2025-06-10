@@ -14,11 +14,12 @@ tensor* tensor_create(
     const size_t n_dimentions, 
     const dynarray shape, 
     pml_err_t* error) {
+    
     if (data_len == 0) {
         *error = PML_EMPTY_TENSOR;
         return NULL;
     }
-    if (!&shape) {
+    if (shape._size == 0) {
         *error = PML_INCORRECT_INPUT;
         return NULL;
     }
@@ -31,12 +32,16 @@ tensor* tensor_create(
     dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
     if (err_strides != PML_OK) {
         *error = err_strides;
+        dynarray_free(&strides);
+        free(tnsr);
         return NULL;
     }
     if (n_dimentions != 0) {
         err_strides = strides.resize(&strides, n_dimentions);
         if (err_strides != PML_OK) {
             *error = err_strides;
+            dynarray_free(&strides);
+            free(tnsr);
             return NULL;
         }
     }
@@ -47,6 +52,8 @@ tensor* tensor_create(
         if (res_get.err != PML_OK) {
             printf("Error (shape, res_get): %d, i: %d\n", res_get.err, i);
             *error = PML_INCORRECT_INPUT;
+            dynarray_free(&strides);
+            free(tnsr);
             return NULL;
         }
         n_elems *= (size_t)res_get.val.i;
@@ -57,6 +64,8 @@ tensor* tensor_create(
         tnsr->data = malloc(sizeof(int32_t) * n_elems);
         if (!tnsr->data) {
             *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            dynarray_free(&strides);
             return NULL;
         }
         memcpy(tnsr->data, data, n_elems * sizeof(int32_t));
@@ -66,6 +75,8 @@ tensor* tensor_create(
         tnsr->data = malloc(sizeof(float) * n_elems);
         if (!tnsr->data) {
             *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            dynarray_free(&strides);
             return NULL;
         }
         memcpy(tnsr->data, data, n_elems * sizeof(float));
@@ -73,12 +84,68 @@ tensor* tensor_create(
         break;
     default:
         *error = PML_WRONG_TYPE;
+        free(tnsr);
+        dynarray_free(&strides);
         printf("Type is not supported\n");
         return NULL;
         break;
     }
     tnsr->print = tensor_print;
     tnsr->data_num_elems = n_elems;
+    tnsr->strides = strides;
+    return tnsr;
+}
+
+tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type, pml_err_t* error) {
+    if (!value_ptr) {
+        *error = PML_EMPTY_TENSOR;
+        return NULL;
+    }
+    tensor* tnsr = (tensor*)malloc(sizeof(tensor));
+    tnsr->type = type;
+    tnsr->n_dim = 0;
+    tnsr->data_num_elems = 1;
+    tnsr->print = tensor_print;
+    switch (type) {
+    case TYPE_INT32:
+        tnsr->data = malloc(sizeof(int32_t));
+        if (!tnsr->data) {
+            *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            return NULL;
+        }
+        memcpy(tnsr->data, value_ptr, sizeof(int32_t));
+        *error = PML_OK;
+        break;
+    case TYPE_FLOAT:
+        tnsr->data = malloc(sizeof(float));
+        if (!tnsr->data) {
+            *error = PML_OUT_OF_MEMORY;
+            free(tnsr);
+            return NULL;
+        }
+        memcpy(tnsr->data, value_ptr, sizeof(float));
+        *error = PML_OK;
+        break;
+    default:
+        *error = PML_WRONG_TYPE;
+        free(tnsr);
+        printf("Type is not supported\n");
+        return NULL;
+        break;
+    }
+    *error = PML_OK;
+    dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, error);
+    if (*error != PML_OK) {
+        free(tnsr);
+        return NULL;
+    }
+    dynarray shape = dynarray_create(NULL, 0, TYPE_INT32, error);
+    if (*error != PML_OK) {
+        free(tnsr);
+        return NULL;
+    }
+    tnsr->shape = shape;
     tnsr->strides = strides;
     return tnsr;
 }
@@ -144,14 +211,31 @@ static void print_helper(const tensor* self, size_t shape_idx, void* data) {
 }
 
 static void tensor_print(const tensor* self) {
-    printf("Tensor: {\n");
-    print_helper(self, 0, self->data);
-    printf("\n");
-    printf("Shape: ");
-    self->shape.print(&self->shape);
-    printf("Strides: ");
-    self->strides.print(&self->strides);
-    printf("}\n");
+    if (self->n_dim != 0) {
+        printf("Tensor: {\n");
+        print_helper(self, 0, self->data);
+        printf("\n");
+        printf("Shape: ");
+        self->shape.print(&self->shape);
+        printf("Strides: ");
+        self->strides.print(&self->strides);
+        printf("}\n");
+    }
+    else {
+        switch (self->type)
+        {
+        case TYPE_INT32:
+            printf("Tensor (scalar): %d\n", *(int32_t*)self->data);
+            break;
+        case TYPE_FLOAT:
+            printf("Tensor (scalar): %f\n", *(float*)self->data);
+            break;
+        default:
+            printf("Type is not supported\n");
+            return;
+            break;
+        }
+    }
 }
 
 void tensor_free(tensor* obj) {
@@ -185,3 +269,5 @@ bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err) {
 
     return 1;
 }
+
+static bool tensor_broadcast_tensors(const tensor_iterator* left, tensor_iterator* right);

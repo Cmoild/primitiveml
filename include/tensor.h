@@ -26,17 +26,22 @@ tensor* tensor_create(
     pml_err_t* error
 );
 
+tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type, pml_err_t* error);
+
 void tensor_free(tensor* obj);
 
 bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
 
 typedef struct tensor_iterator {
-    dynarray counter;
-    container_type_t type;
-    result_t (*get_next)(const struct tensor* obj);
+    dynarray current_indices;
+    void* data_ptr;
+    size_t element_size;
+    bool finished;
+    bool started;
+    void* (*get_next)(struct tensor_iterator* self, const dynarray* shape, const dynarray* strides, pml_err_t* err);
 } tensor_iterator;
 
-tensor_iterator* tensor_iterator_create(tensor* obj);
+tensor_iterator* tensor_iterator_create(tensor* obj, pml_err_t* err);
 
 void tensor_iterator_free(tensor_iterator* obj);
 
