@@ -25,7 +25,7 @@ int main(){
     tensor1->print(tensor1);
     tensor2->print(tensor2);
 
-    tensor* result = tensor_add(tensor1, tensor2, TYPE_INT32, &err);
+    tensor* result = tensor_divide(tensor1, tensor2, TYPE_INT32, &err);
     result->print(result);
     
     tensor_free(tensor1);

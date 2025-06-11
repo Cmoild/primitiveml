@@ -41,6 +41,12 @@ bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
 
 tensor* tensor_add(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
 
+tensor* tensor_subtract(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
+
+tensor* tensor_multiply(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
+
+tensor* tensor_divide(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
+
 typedef struct tensor_iterator {
     dynarray current_indices;
     void* data_ptr;
