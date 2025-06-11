@@ -354,4 +354,207 @@ bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err) {
     return 1;
 }
 
-static bool tensor_broadcast_tensors(const tensor_iterator* left, tensor_iterator* right);
+typedef struct tensor_broadcast_tensors_tuple_t {
+    dynarray left_strides;
+    dynarray right_strides;
+    dynarray result_shape;
+} tensor_broadcast_tensors_tuple_t;
+
+static tensor_broadcast_tensors_tuple_t
+tensor_broadcast_tensors(const tensor* left, tensor* right, pml_err_t* err) {
+    tensor_broadcast_tensors_tuple_t out;
+    size_t max_n_dim = (left->n_dim > right->n_dim) ? left->n_dim : right->n_dim;
+    dynarray result_shape = dynarray_zeros(max_n_dim, TYPE_INT32, err);
+    if (*err != PML_OK) {
+        return out;
+    }
+    dynarray left_strides = dynarray_zeros(max_n_dim, TYPE_INT32, err);
+    if (*err != PML_OK) {
+        return out;
+    }
+    dynarray right_strides = dynarray_zeros(max_n_dim, TYPE_INT32, err);
+    if (*err != PML_OK) {
+        return out;
+    }
+    // Tensors must be broadcastable at this moment (check it before calling this function)
+    for (int i = 0; i < (int)max_n_dim; i++) {
+        if (i < left->shape._size && i < right->shape._size) {
+            result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
+            if (left_cur.err != PML_OK) {
+                *err = left_cur.err;
+                return out;
+            }
+            result_t right_cur = right->shape.get_at(&right->shape, right->shape._size - 1 - i);
+            if (right_cur.err != PML_OK) {
+                *err = right_cur.err;
+                return out;
+            }
+            result_t left_stride_cur = left->strides.get_at(&left->strides, left->strides._size - 1 - i);
+            if (left_stride_cur.err != PML_OK) {
+                *err = left_stride_cur.err;
+                return out;
+            }
+            result_t right_stride_cur = right->strides.get_at(&right->strides, right->strides._size - 1 - i);
+            if (right_stride_cur.err != PML_OK) {
+                *err = right_stride_cur.err;
+                return out;
+            }
+            if (left_cur.val.i == right_cur.val.i) {
+                left_strides.set_at(&left_strides, left_strides._size - 1 - i, &left_stride_cur.val.i);
+                right_strides.set_at(&right_strides, right_strides._size - 1 - i, &right_stride_cur.val.i);
+            } else if (left_cur.val.i != right_cur.val.i && left_cur.val.i == 1) {
+                int32_t new_val = 0;
+                left_strides.set_at(&left_strides, left_strides._size - 1 - i, &new_val);
+                right_strides.set_at(&right_strides, right_strides._size - 1 - i, &right_stride_cur.val.i);
+            } else if (left_cur.val.i != right_cur.val.i && right_cur.val.i == 1) {
+                left_strides.set_at(&left_strides, left_strides._size - 1 - i, &left_stride_cur.val.i);
+                int32_t new_val = 0;
+                right_strides.set_at(&right_strides, right_strides._size - 1 - i, &new_val);
+            }
+            int32_t max_dim_size = (left_cur.val.i > right_cur.val.i) ? left_cur.val.i : right_cur.val.i;
+            result_shape.set_at(&result_shape, result_shape._size - 1 - i, &max_dim_size);
+        } else if (i < left->shape._size && i >= right->shape._size) {
+            result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
+            if (left_cur.err != PML_OK) {
+                *err = left_cur.err;
+                return out;
+            }
+            result_t left_stride_cur = left->strides.get_at(&left->strides, left->strides._size - 1 - i);
+            if (left_stride_cur.err != PML_OK) {
+                *err = left_stride_cur.err;
+                return out;
+            }
+            int32_t new_val = 0;
+            left_strides.set_at(&left_strides, left_strides._size - 1 - i, &left_stride_cur.val.i);
+            right_strides.set_at(&right_strides, right_strides._size - 1 - i, &new_val);
+            result_shape.set_at(&result_shape, result_shape._size - 1 - i, &left_cur.val.i);
+        } else if (i >= left->shape._size && i < right->shape._size) {
+            result_t right_cur = right->shape.get_at(&right->shape, right->shape._size - 1 - i);
+            if (right_cur.err != PML_OK) {
+                *err = right_cur.err;
+                return out;
+            }
+            result_t right_stride_cur = right->strides.get_at(&right->strides, right->strides._size - 1 - i);
+            if (right_stride_cur.err != PML_OK) {
+                *err = right_stride_cur.err;
+                return out;
+            }
+            int32_t new_val = 0;
+            left_strides.set_at(&left_strides, left_strides._size - 1 - i, &new_val);
+            right_strides.set_at(&right_strides, right_strides._size - 1 - i, &right_stride_cur.val.i);
+            result_shape.set_at(&result_shape, result_shape._size - 1 - i, &right_cur.val.i);
+        }
+    }
+    out.left_strides = left_strides;
+    out.right_strides = right_strides;
+    out.result_shape = result_shape;
+    return out;
+}
+
+static tensor* tensor_apply_elementwise_operation(
+    tensor* left, tensor* right, pml_err_t* err, container_type_t type,
+    void (*operation)(void* result_ptr, void* left_ptr, void* right_ptr, container_type_t type, pml_err_t* err)
+) {
+    *err = PML_OK;
+    tensor* result;
+    if (tensor_shapes_broadcastable(left, right, err)) {
+        tensor_broadcast_tensors_tuple_t out = tensor_broadcast_tensors(left, right, err);
+        if (*err != PML_OK) {
+            dynarray_free(&out.left_strides);
+            dynarray_free(&out.right_strides);
+            dynarray_free(&out.result_shape);
+            return NULL;
+        }
+        result = tensor_create_zeros(type, out.result_shape._size, out.result_shape, err);
+        if (*err != PML_OK) {
+            dynarray_free(&out.left_strides);
+            dynarray_free(&out.right_strides);
+            dynarray_free(&out.result_shape);
+            free(result);
+            return NULL;
+        }
+        tensor_iterator* iterator_left = tensor_iterator_create(left, err);
+        if (*err != PML_OK) {
+            dynarray_free(&out.left_strides);
+            dynarray_free(&out.right_strides);
+            dynarray_free(&out.result_shape);
+            free(result);
+            tensor_iterator_free(iterator_left);
+            free(iterator_left);
+            return NULL;
+        }
+        tensor_iterator* iterator_right = tensor_iterator_create(right, err);
+        if (*err != PML_OK) {
+            dynarray_free(&out.left_strides);
+            dynarray_free(&out.right_strides);
+            dynarray_free(&out.result_shape);
+            free(result);
+            tensor_iterator_free(iterator_left);
+            free(iterator_left);
+            tensor_iterator_free(iterator_right);
+            free(iterator_right);
+            return NULL;
+        }
+        tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+        if (*err != PML_OK) {
+            dynarray_free(&out.left_strides);
+            dynarray_free(&out.right_strides);
+            dynarray_free(&out.result_shape);
+            free(result);
+            tensor_iterator_free(iterator_left);
+            free(iterator_left);
+            tensor_iterator_free(iterator_right);
+            free(iterator_right);
+            tensor_iterator_free(iterator_result);
+            free(iterator_result);
+            return NULL;
+        }
+        do {
+            void* left_ptr = iterator_left->get_next(iterator_left, &out.result_shape, &out.left_strides, err);
+            void* right_ptr = iterator_right->get_next(iterator_right, &out.result_shape, &out.right_strides, err);
+            void* result_ptr = iterator_result->get_next(iterator_result, &out.result_shape, &result->strides, err);
+            if (left_ptr && right_ptr && result_ptr) {
+                operation(result_ptr, left_ptr, right_ptr, type, err);
+                if (*err != PML_OK) {
+                    break;
+                }
+                // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
+            }
+        } while (!iterator_left->finished && !iterator_right->finished && !iterator_result->finished);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.right_strides);
+        tensor_iterator_free(iterator_left);
+        free(iterator_left);
+        tensor_iterator_free(iterator_right);
+        free(iterator_right);
+        tensor_iterator_free(iterator_result);
+        free(iterator_result);
+    } else {
+        if (*err == PML_OK) {
+            *err = PML_TENSORS_NOT_BROADCASTABLE;
+        }
+        return NULL;
+    }
+    return result;
+}
+
+void tensor_add_operation(void* result_ptr, void* left_ptr, void* right_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i = *(int32_t*)left_ptr + *(int32_t*)right_ptr;
+        break;
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = *(float*)left_ptr + *(float*)right_ptr;
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+tensor* tensor_add(tensor* left, tensor* right, container_type_t type, pml_err_t* err) {
+    return tensor_apply_elementwise_operation(left, right, err, type, tensor_add_operation);
+}

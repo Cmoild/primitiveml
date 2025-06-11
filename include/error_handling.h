@@ -8,6 +8,7 @@ typedef enum pml_err_t {
     PML_OUT_OF_BOUNDS = 3,
     PML_EMPTY_TENSOR = 4,
     PML_INCORRECT_INPUT = 5,
+    PML_TENSORS_NOT_BROADCASTABLE = 6,
 } pml_err_t;
 
 #endif // ERROR_HANDLING_H
