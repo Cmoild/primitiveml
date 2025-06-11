@@ -47,6 +47,16 @@ tensor* tensor_multiply(tensor* left, tensor* right, container_type_t type, pml_
 
 tensor* tensor_divide(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
 
+tensor* tensor_axis_sum(tensor* tensor, const size_t axis, pml_err_t* err);
+
+tensor* tensor_axis_max(tensor* tensor, const size_t axis, pml_err_t* err);
+
+tensor* tensor_axis_min(tensor* tensor, const size_t axis, pml_err_t* err);
+
+tensor* tensor_axis_mean(tensor* tensor, const size_t axis, pml_err_t* err);
+
+tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err);
+
 typedef struct tensor_iterator {
     dynarray current_indices;
     void* data_ptr;

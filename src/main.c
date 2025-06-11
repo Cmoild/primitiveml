@@ -6,33 +6,23 @@
 
 int main(){
     pml_err_t err = PML_OK;
-    int32_t raw_shape1[] = {2, 2};
-    dynarray shape1 = dynarray_create(raw_shape1, 2, TYPE_INT32, &err);
-    int32_t raw_data1[] = {1, 2, 3, 4};
-    tensor* tensor1 = tensor_create(raw_data1, 4, TYPE_INT32, 2, shape1, &err);
+    int32_t shape_init_raw[] = {2, 2, 3};
+    dynarray shape_init = dynarray_create(shape_init_raw, 3, TYPE_INT32, &err);
+    float data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    tensor* tens = tensor_create(data, 12, TYPE_FLOAT, 3, shape_init, &err);
     if (err != PML_OK) {
         printf("Error: %d\n", err);
         return 1;
     }
-    int32_t raw_shape2[] = {2};
-    dynarray shape2 = dynarray_create(raw_shape2, 1, TYPE_INT32, &err);
-    int32_t raw_data2[] = {1, 2};
-    tensor* tensor2 = tensor_create(raw_data2, 2, TYPE_INT32, 1, shape2, &err);
-    if (err != PML_OK) {
-        printf("Error: %d\n", err);
-        return 1;
-    }
-    tensor1->print(tensor1);
-    tensor2->print(tensor2);
-
-    tensor* result = tensor_divide(tensor1, tensor2, TYPE_INT32, &err);
-    result->print(result);
+    tens->print(tens);
     
-    tensor_free(tensor1);
-    free(tensor1);
-    tensor_free(tensor2);
-    free(tensor2);
-    tensor_free(result);
-    free(result);
+    tensor* new = tensor_axis_var(tens, 0, &err);
+
+    new->print(new);
+
+    tensor_free(tens);
+    free(tens);
+    tensor_free(new);
+    free(new);
     return 0;
 }

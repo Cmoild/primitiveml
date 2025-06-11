@@ -516,6 +516,8 @@ static tensor* tensor_apply_elementwise_operation(
             if (left_ptr && right_ptr && result_ptr) {
                 operation(result_ptr, left_ptr, right_ptr, type, err);
                 if (*err != PML_OK) {
+                    tensor_free(result);
+                    free(result);
                     break;
                 }
                 // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
@@ -620,4 +622,388 @@ static void tensor_divide_operation(void* result_ptr, void* left_ptr, void* righ
 
 tensor* tensor_divide(tensor* left, tensor* right, container_type_t type, pml_err_t* err) {
     return tensor_apply_elementwise_operation(left, right, err, type, tensor_divide_operation);
+}
+
+static tensor* tensor_apply_unary_axis(
+    tensor* obj, const size_t axis, pml_err_t* err, container_type_t type,
+    void (*axis_operation)(
+        tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+        const dynarray* strides_res, const dynarray* transposed_obj_strides,
+        const dynarray* res_shape, const dynarray* transposed_obj_shape,
+        const size_t dim_size,
+        container_type_t type, pml_err_t* err
+    )
+) {
+    if (obj->n_dim == 0) {
+        *err = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+    *err = PML_OK;
+    dynarray transposed_shape = dynarray_clone(&obj->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    if (axis >= transposed_shape._size) {
+        *err = PML_OUT_OF_BOUNDS;
+        dynarray_free(&transposed_shape);
+        return NULL;
+    }
+    dynarray transposed_strides = dynarray_clone(&obj->strides, err);
+    if (*err != PML_OK) {
+        dynarray_free(&transposed_shape);
+        return NULL;
+    }
+    int32_t* raw_transposed_shape = (int32_t*)transposed_shape._container;
+    int32_t* raw_transposed_strides = (int32_t*)transposed_strides._container;
+    int32_t shape_at_axis = raw_transposed_shape[axis];
+    int32_t stride_at_axis = raw_transposed_strides[axis];
+    int idx = 0;
+    for (int i = 0; i < (int)transposed_shape._size - 1; i++) {
+        if (i != (int)axis) {
+            raw_transposed_shape[i] = raw_transposed_shape[idx];
+            raw_transposed_strides[i] = raw_transposed_strides[idx];
+            idx++;
+        } else {
+            raw_transposed_shape[i] = raw_transposed_shape[idx + 1];
+            raw_transposed_strides[i] = raw_transposed_strides[idx + 1];
+            idx += 2;
+        }
+    }
+    raw_transposed_shape[transposed_shape._size - 1] = shape_at_axis;
+    raw_transposed_strides[transposed_shape._size - 1] = stride_at_axis;
+
+    dynarray output_shape = dynarray_create(raw_transposed_shape, transposed_shape._size - 1, TYPE_INT32, err);
+    if (*err != PML_OK) {
+        dynarray_free(&transposed_shape);
+        dynarray_free(&transposed_strides);
+        return NULL;
+    }
+    tensor* result = tensor_create_zeros(type, transposed_shape._size - 1, output_shape, err);
+    if (transposed_shape._size - 1 == 0) {
+        // tensor_create_zeros throws error when n_dim == 0
+        int64_t zero = 0;
+        result = tensor_create_scalar(&zero, type, err);
+    }
+    if (*err != PML_OK) {
+        dynarray_free(&transposed_shape);
+        dynarray_free(&transposed_strides);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        dynarray_free(&transposed_shape);
+        dynarray_free(&transposed_strides);
+        tensor_free(result);
+        free(result);
+        free(iterator_result);
+        return NULL;
+    }
+    tensor_iterator* iterator_obj = tensor_iterator_create(obj, err);
+    if (*err != PML_OK) {
+        dynarray_free(&transposed_shape);
+        dynarray_free(&transposed_strides);
+        tensor_free(result);
+        free(result);
+        tensor_iterator_free(iterator_result);
+        free(iterator_result);
+        free(iterator_obj);
+        return NULL;
+    }
+    axis_operation(
+        iterator_result, iterator_obj,
+        &result->strides, &transposed_strides,
+        &result->shape, &transposed_shape,
+        (size_t)shape_at_axis, type, err
+    );
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        return NULL;
+    }
+    dynarray_free(&transposed_shape);
+    dynarray_free(&transposed_strides);
+    tensor_iterator_free(iterator_result);
+    free(iterator_result);
+    tensor_iterator_free(iterator_obj);
+    free(iterator_obj);
+    return result;
+}
+
+static void axis_operation_sum_util(void* result_ptr, void* obj_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i += *(int32_t*)obj_ptr;
+        break;
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f += *(float*)obj_ptr;
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_sum(
+    tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+    const dynarray* strides_res, const dynarray* transposed_obj_strides,
+    const dynarray* res_shape, const dynarray* transposed_obj_shape,
+    const size_t dim_size,
+    container_type_t type, pml_err_t* err
+) {
+    do {
+        void* result_ptr = iterator_res->get_next(iterator_res, res_shape, strides_res, err);
+        for (size_t i = 0; i < dim_size && result_ptr; i++) {
+            void* obj_ptr = iterator_obj->get_next(iterator_obj, transposed_obj_shape, transposed_obj_strides, err);
+            if (obj_ptr && *err == PML_OK) {
+                axis_operation_sum_util(result_ptr, obj_ptr, type, err);
+                if (*err != PML_OK) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+    } while (!iterator_res->finished && !iterator_obj->finished);
+}
+
+tensor* tensor_axis_sum(tensor* tensor, const size_t axis, pml_err_t* err) {
+    return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_sum);
+}
+
+static void axis_operation_max_util(void* result_ptr, void* obj_ptr, const size_t iter, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        if (iter == 0) {
+            int32_t* result_ptr_i = result_ptr;
+            *result_ptr_i = *(int32_t*)obj_ptr;
+        } else {
+            int32_t* result_ptr_i = result_ptr;
+            *result_ptr_i = (*result_ptr_i > *(int32_t*)obj_ptr) ? *result_ptr_i : *(int32_t*)obj_ptr;
+        }
+        break;
+    case TYPE_FLOAT:
+        if (iter == 0) {
+            float* result_ptr_i = result_ptr;
+            *result_ptr_i = *(float*)obj_ptr;
+        } else {
+            float* result_ptr_i = result_ptr;
+            *result_ptr_i = (*result_ptr_i > *(float*)obj_ptr) ? *result_ptr_i : *(float*)obj_ptr;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_max(
+    tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+    const dynarray* strides_res, const dynarray* transposed_obj_strides,
+    const dynarray* res_shape, const dynarray* transposed_obj_shape,
+    const size_t dim_size,
+    container_type_t type, pml_err_t* err
+) {
+    do {
+        void* result_ptr = iterator_res->get_next(iterator_res, res_shape, strides_res, err);
+        for (size_t i = 0; i < dim_size && result_ptr; i++) {
+            void* obj_ptr = iterator_obj->get_next(iterator_obj, transposed_obj_shape, transposed_obj_strides, err);
+            if (obj_ptr && *err == PML_OK) {
+                axis_operation_max_util(result_ptr, obj_ptr, i, type, err);
+                if (*err != PML_OK) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+    } while (!iterator_res->finished && !iterator_obj->finished);
+}
+
+tensor* tensor_axis_max(tensor* tensor, const size_t axis, pml_err_t* err) {
+    return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_max);
+}
+
+static void axis_operation_min_util(void* result_ptr, void* obj_ptr, const size_t iter, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        if (iter == 0) {
+            int32_t* result_ptr_i = result_ptr;
+            *result_ptr_i = *(int32_t*)obj_ptr;
+        } else {
+            int32_t* result_ptr_i = result_ptr;
+            *result_ptr_i = (*result_ptr_i < *(int32_t*)obj_ptr) ? *result_ptr_i : *(int32_t*)obj_ptr;
+        }
+        break;
+    case TYPE_FLOAT:
+        if (iter == 0) {
+            float* result_ptr_i = result_ptr;
+            *result_ptr_i = *(float*)obj_ptr;
+        } else {
+            float* result_ptr_i = result_ptr;
+            *result_ptr_i = (*result_ptr_i < *(float*)obj_ptr) ? *result_ptr_i : *(float*)obj_ptr;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_min(
+    tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+    const dynarray* strides_res, const dynarray* transposed_obj_strides,
+    const dynarray* res_shape, const dynarray* transposed_obj_shape,
+    const size_t dim_size,
+    container_type_t type, pml_err_t* err
+) {
+    do {
+        void* result_ptr = iterator_res->get_next(iterator_res, res_shape, strides_res, err);
+        for (size_t i = 0; i < dim_size && result_ptr; i++) {
+            void* obj_ptr = iterator_obj->get_next(iterator_obj, transposed_obj_shape, transposed_obj_strides, err);
+            if (obj_ptr && *err == PML_OK) {
+                axis_operation_min_util(result_ptr, obj_ptr, i, type, err);
+                if (*err != PML_OK) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+    } while (!iterator_res->finished && !iterator_obj->finished);
+}
+
+tensor* tensor_axis_min(tensor* tensor, const size_t axis, pml_err_t* err) {
+    return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_min);
+}
+
+static void axis_operation_mean_util(void* result_ptr, size_t n_elems, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i /= (int32_t)n_elems;
+        break;
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f /= (float)n_elems;
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_mean(
+    tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+    const dynarray* strides_res, const dynarray* transposed_obj_strides,
+    const dynarray* res_shape, const dynarray* transposed_obj_shape,
+    const size_t dim_size,
+    container_type_t type, pml_err_t* err
+) {
+    do {
+        void* result_ptr = iterator_res->get_next(iterator_res, res_shape, strides_res, err);
+        for (size_t i = 0; i < dim_size && result_ptr; i++) {
+            void* obj_ptr = iterator_obj->get_next(iterator_obj, transposed_obj_shape, transposed_obj_strides, err);
+            if (obj_ptr && *err == PML_OK) {
+                axis_operation_sum_util(result_ptr, obj_ptr, type, err);
+                if (*err != PML_OK) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+        if (result_ptr) axis_operation_mean_util(result_ptr, dim_size, type, err);
+        if (*err != PML_OK) {
+            return;
+        }
+    } while (!iterator_res->finished && !iterator_obj->finished);
+}
+
+tensor* tensor_axis_mean(tensor* tensor, const size_t axis, pml_err_t* err) {
+    return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_mean);
+}
+
+static void axis_operation_var_sum_util(void* result_ptr, void** sum_squares, void* obj_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        if (!*sum_squares) {
+            *sum_squares = malloc(sizeof(int32_t));
+            **(int32_t**)sum_squares = 0;
+        }
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i += *(int32_t*)obj_ptr;
+        **(int32_t**)sum_squares += *(int32_t*)obj_ptr * *(int32_t*)obj_ptr;
+        break;
+    case TYPE_FLOAT:
+        if (!*sum_squares) {
+            *sum_squares = malloc(sizeof(float));
+            **(float**)sum_squares = 0;
+        }
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f += *(float*)obj_ptr;
+        **(float**)sum_squares += *(float*)obj_ptr * *(float*)obj_ptr;
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_var_util(void* result_ptr, void* sum_squares, size_t n_elem, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i = *(int32_t*)sum_squares / (int32_t)n_elem - (*result_ptr_i / (int32_t)n_elem) * (*result_ptr_i / (int32_t)n_elem);
+        break;
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = *(float*)sum_squares / (float)n_elem - (*result_ptr_f / (float)n_elem) * (*result_ptr_f / (float)n_elem);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+static void axis_operation_var(
+    tensor_iterator* iterator_res, tensor_iterator* iterator_obj,
+    const dynarray* strides_res, const dynarray* transposed_obj_strides,
+    const dynarray* res_shape, const dynarray* transposed_obj_shape,
+    const size_t dim_size,
+    container_type_t type, pml_err_t* err
+) {
+    do {
+        void* result_ptr = iterator_res->get_next(iterator_res, res_shape, strides_res, err);
+        if (result_ptr) {
+            void* sum_squares = NULL;
+            for (size_t i = 0; i < dim_size; i++) {
+                void* obj_ptr = iterator_obj->get_next(iterator_obj, transposed_obj_shape, transposed_obj_strides, err);
+                if (obj_ptr && *err == PML_OK) {
+                    axis_operation_var_sum_util(result_ptr, &sum_squares, obj_ptr, type, err);
+                    if (*err != PML_OK) {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            axis_operation_var_util(result_ptr, sum_squares, dim_size, type, err);
+            free(sum_squares);
+            if (*err != PML_OK) {
+                return;
+            }
+        }
+    } while (!iterator_res->finished && !iterator_obj->finished);
+}
+
+tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err) {
+    return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_var);
 }
