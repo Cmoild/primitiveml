@@ -19,10 +19,10 @@ tensor* tensor_create(
         *error = PML_EMPTY_TENSOR;
         return NULL;
     }
-    if (shape._size == 0) {
-        *error = PML_INCORRECT_INPUT;
-        return NULL;
-    }
+    // if (shape._size == 0) {
+    //     *error = PML_INCORRECT_INPUT;
+    //     return NULL;
+    // }
     tensor* tnsr = (tensor*)malloc(sizeof(tensor));
     tnsr->type = type;
     tnsr->shape = shape;
@@ -155,10 +155,10 @@ tensor* tensor_create_zeros(
     const dynarray shape, 
     pml_err_t* error) {
     
-    if (shape._size == 0) {
-        *error = PML_INCORRECT_INPUT;
-        return NULL;
-    }
+    // if (shape._size == 0) {
+    //     *error = PML_INCORRECT_INPUT;
+    //     return NULL;
+    // }
     tensor* tnsr = (tensor*)malloc(sizeof(tensor));
     tnsr->type = type;
     tnsr->shape = shape;
