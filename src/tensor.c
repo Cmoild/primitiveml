@@ -361,7 +361,7 @@ typedef struct tensor_broadcast_tensors_tuple_t {
 } tensor_broadcast_tensors_tuple_t;
 
 static tensor_broadcast_tensors_tuple_t
-tensor_broadcast_tensors(const tensor* left, tensor* right, pml_err_t* err) {
+tensor_broadcast_tensors(const tensor* left, const tensor* right, pml_err_t* err) {
     tensor_broadcast_tensors_tuple_t out;
     size_t max_n_dim = (left->n_dim > right->n_dim) ? left->n_dim : right->n_dim;
     dynarray result_shape = dynarray_zeros(max_n_dim, TYPE_INT32, err);
@@ -470,7 +470,6 @@ static tensor* tensor_apply_elementwise_operation(
             dynarray_free(&out.left_strides);
             dynarray_free(&out.right_strides);
             dynarray_free(&out.result_shape);
-            free(result);
             return NULL;
         }
         tensor_iterator* iterator_left = tensor_iterator_create(left, err);
@@ -479,7 +478,6 @@ static tensor* tensor_apply_elementwise_operation(
             dynarray_free(&out.right_strides);
             dynarray_free(&out.result_shape);
             free(result);
-            tensor_iterator_free(iterator_left);
             free(iterator_left);
             return NULL;
         }
@@ -489,9 +487,7 @@ static tensor* tensor_apply_elementwise_operation(
             dynarray_free(&out.right_strides);
             dynarray_free(&out.result_shape);
             free(result);
-            tensor_iterator_free(iterator_left);
             free(iterator_left);
-            tensor_iterator_free(iterator_right);
             free(iterator_right);
             return NULL;
         }
@@ -501,11 +497,8 @@ static tensor* tensor_apply_elementwise_operation(
             dynarray_free(&out.right_strides);
             dynarray_free(&out.result_shape);
             free(result);
-            tensor_iterator_free(iterator_left);
             free(iterator_left);
-            tensor_iterator_free(iterator_right);
             free(iterator_right);
-            tensor_iterator_free(iterator_result);
             free(iterator_result);
             return NULL;
         }
@@ -1086,7 +1079,7 @@ static void tensor_matmul_2d(
 }
 
 static tensor* tensor_apply_matmul(
-    const tensor* left, const tensor* right, const container_type_t type, pml_err_t* err
+    tensor* left, tensor* right, const container_type_t type, pml_err_t* err
 ) {
     if (left->shape._size < 1 || right->shape._size < 1) {
         *err = PML_INCORRECT_INPUT;
@@ -1095,6 +1088,7 @@ static tensor* tensor_apply_matmul(
     tensor* result = NULL;
     if (left->shape._size <= 2 && right->shape._size <= 2) {
         int reshape_counter = 0;
+        bool right_reshaped = false;
 
         int32_t shape_row_left;
         int32_t shape_col_left;
@@ -1125,6 +1119,7 @@ static tensor* tensor_apply_matmul(
             stride_row_right = *(int32_t*)right->strides._container;
             stride_col_right = 0;
             reshape_counter++;
+            right_reshaped = true;
         } else {
             shape_row_right = *(int32_t*)right->shape._container;
             shape_col_right = *(int32_t*)(right->shape._container + sizeof(int32_t));
@@ -1173,19 +1168,316 @@ static tensor* tensor_apply_matmul(
             result->strides.resize(&result->strides, 0);
         } else if (reshape_counter == 1) {
             result->n_dim = 1;
+            if (!right_reshaped) {
+                *(int32_t*)result->shape._container = result->shape.get_at(&result->shape, result->shape._size - 1).val.i;
+                *(int32_t*)result->strides._container = result->strides.get_at(&result->strides, result->strides._size - 1).val.i;
+            }
             result->shape.resize(&result->shape, 1);
             result->strides.resize(&result->strides, 1);
-            *(int32_t*)result->shape._container = 1;
-            *(int32_t*)result->strides._container = 1;
         }
 
         return result;
     }
-    // Batch handling is not yet implemented
-    return NULL;
+    
+    int reshape_counter = 0;
+    bool right_reshaped = false;
+
+    int32_t shape_row_left;
+    int32_t shape_col_left;
+    int32_t stride_row_left;
+    int32_t stride_col_left;
+
+    if (left->shape._size == 1) {
+        shape_row_left = 1;
+        shape_col_left = *(int32_t*)left->shape._container;
+        stride_row_left = 0;
+        stride_col_left = *(int32_t*)left->strides._container;
+        reshape_counter++;
+    } else {
+        shape_row_left = left->shape.get_at(&left->shape, left->shape._size - 2).val.i;
+        shape_col_left = left->shape.get_at(&left->shape, left->shape._size - 1).val.i;
+        stride_row_left = left->strides.get_at(&left->strides, left->strides._size - 2).val.i;
+        stride_col_left = left->strides.get_at(&left->strides, left->strides._size - 1).val.i;
+    }
+
+    int32_t shape_row_right;
+    int32_t shape_col_right;
+    int32_t stride_row_right;
+    int32_t stride_col_right;
+
+    if (right->shape._size == 1) {
+        shape_row_right = *(int32_t*)right->shape._container;
+        shape_col_right = 1;
+        stride_row_right = *(int32_t*)right->strides._container;
+        stride_col_right = 0;
+        reshape_counter++;
+        right_reshaped = true;
+    } else {
+        shape_row_right = right->shape.get_at(&right->shape, right->shape._size - 2).val.i;
+        shape_col_right = right->shape.get_at(&right->shape, right->shape._size - 1).val.i;
+        stride_row_right = right->strides.get_at(&right->strides, right->strides._size - 2).val.i;
+        stride_col_right = right->strides.get_at(&right->strides, right->strides._size - 1).val.i;
+    }
+
+    if (shape_col_left != shape_row_right) {
+        *err = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+
+    int32_t batch_num_shape = (right->shape._size > left->shape._size) ? (right->shape._size - 2) : (left->shape._size - 2);
+
+    dynarray left_batch_shape = dynarray_zeros(
+        (size_t)(((int32_t)left->shape._size - 2 > 0) ? (left->shape._size - 2) : 0),
+        TYPE_INT32, err
+    );
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    dynarray left_batch_strides = dynarray_zeros(
+        (size_t)(((int32_t)left->shape._size - 2 > 0) ? (left->shape._size - 2) : 0), 
+        TYPE_INT32, err
+    );
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        return NULL;
+    }
+    dynarray right_batch_shape = dynarray_zeros(
+        (size_t)(((int32_t)right->shape._size - 2 > 0) ? (right->shape._size - 2) : 0), 
+        TYPE_INT32, err
+    );
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        return NULL;
+    }
+    dynarray right_batch_strides = dynarray_zeros(
+        (size_t)(((int32_t)right->shape._size - 2 > 0) ? (right->shape._size - 2) : 0), 
+        TYPE_INT32, err
+    );
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        return NULL;
+    }
+
+    for (int i = 2; i < batch_num_shape + 2; i++) {
+        if (i < left->shape._size) {
+            int32_t shape_val = left->shape.get_at(&left->shape, left->shape._size - i - 1).val.i;
+            int32_t stride_val = left->strides.get_at(&left->strides, left->strides._size - i - 1).val.i;
+            left_batch_shape.set_at(
+                &left_batch_shape,
+                (size_t)batch_num_shape - 1 - (i - 2),
+                &shape_val
+            );
+            left_batch_strides.set_at(
+                &left_batch_strides,
+                (size_t)batch_num_shape - 1 - (i - 2),
+                &stride_val
+            );
+        }
+        if (i < right->shape._size) {
+            int32_t shape_val = right->shape.get_at(&right->shape, right->shape._size - i - 1).val.i;
+            int32_t stride_val = right->strides.get_at(&right->strides, right->strides._size - i - 1).val.i;
+            right_batch_shape.set_at(
+                &right_batch_shape,
+                (size_t)batch_num_shape - 1 - (i - 2),
+                &shape_val
+            );
+            right_batch_strides.set_at(
+                &right_batch_strides,
+                (size_t)batch_num_shape - 1 - (i - 2),
+                &stride_val
+            );
+        }
+    }
+    
+    // Create tensors for compatibility
+    tensor left_batch_part = {
+        .shape = left_batch_shape,
+        .strides = left_batch_strides,
+        .n_dim = left_batch_shape._size,
+    };
+    tensor right_batch_part = {
+        .shape = right_batch_shape,
+        .strides = right_batch_strides,
+        .n_dim = right_batch_shape._size,
+    };
+
+    if (!tensor_shapes_broadcastable(&left_batch_part, &right_batch_part, err)) {
+        if (*err != PML_OK) {
+            dynarray_free(&left_batch_shape);
+            dynarray_free(&left_batch_strides);
+            dynarray_free(&right_batch_shape);
+            dynarray_free(&right_batch_strides);
+            return NULL;
+        }
+        *err = PML_TENSORS_NOT_BROADCASTABLE;
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        return NULL;
+    }
+
+    tensor_broadcast_tensors_tuple_t out = tensor_broadcast_tensors(&left_batch_part, &right_batch_part, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        return NULL;
+    }
+
+    dynarray result_shape = dynarray_zeros((size_t)batch_num_shape + 2, TYPE_INT32, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.result_shape);
+        dynarray_free(&out.right_strides);
+        return NULL;
+    }
+
+    for (int i = 0; i < result_shape._size; i++) {
+        if (i < batch_num_shape) {
+            int32_t shape_val = out.result_shape.get_at(&out.result_shape, (size_t)i).val.i;
+            result_shape.set_at(&result_shape, i, &shape_val);
+        } else if (i == result_shape._size - 2) {
+            result_shape.set_at(&result_shape, i, &shape_row_left);
+        } else {
+            result_shape.set_at(&result_shape, i, &shape_col_right);
+        }
+    }
+
+    result = tensor_create_zeros(type, result_shape._size, result_shape, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.result_shape);
+        dynarray_free(&out.right_strides);
+        dynarray_free(&result_shape);
+        return NULL;
+    }
+
+    tensor_iterator* iterator_left = tensor_iterator_create(left, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.result_shape);
+        dynarray_free(&out.right_strides);
+        dynarray_free(&result_shape);
+        free(iterator_left);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_right = tensor_iterator_create(right, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.result_shape);
+        dynarray_free(&out.right_strides);
+        dynarray_free(&result_shape);
+        free(iterator_left);
+        free(iterator_right);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        dynarray_free(&left_batch_shape);
+        dynarray_free(&left_batch_strides);
+        dynarray_free(&right_batch_shape);
+        dynarray_free(&right_batch_strides);
+        dynarray_free(&out.left_strides);
+        dynarray_free(&out.result_shape);
+        dynarray_free(&out.right_strides);
+        dynarray_free(&result_shape);
+        free(iterator_left);
+        free(iterator_right);
+        free(iterator_result);
+        free(result);
+        return NULL;
+    }
+
+    int32_t stride_row_result = result->strides.get_at(&result->strides, result->strides._size - 2).val.i;
+    int32_t stride_col_result = result->strides.get_at(&result->strides, result->strides._size - 1).val.i;
+
+    do {
+        void* left_ptr = iterator_left->get_next(iterator_left, &out.result_shape, &out.left_strides, err);
+        void* right_ptr = iterator_right->get_next(iterator_right, &out.result_shape, &out.right_strides, err);
+        void* result_ptr = iterator_result->get_next(iterator_result, &out.result_shape, &result->strides, err);
+        if (left_ptr && right_ptr && result_ptr) {
+            // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
+            tensor_matmul_2d(
+                result_ptr, left_ptr, right_ptr,
+                stride_row_result, stride_col_result,
+                stride_row_left, stride_col_left,
+                stride_row_right, stride_col_right,
+                shape_row_left, shape_col_right,
+                shape_row_left, shape_col_left,
+                shape_row_right, shape_col_right,
+                type, err
+            );
+            if (*err != PML_OK) {
+                dynarray_free(&left_batch_shape);
+                dynarray_free(&left_batch_strides);
+                dynarray_free(&right_batch_shape);
+                dynarray_free(&right_batch_strides);
+                dynarray_free(&out.left_strides);
+                dynarray_free(&out.result_shape);
+                dynarray_free(&out.right_strides);
+                dynarray_free(&result_shape);
+                free(iterator_left);
+                free(iterator_right);
+                free(iterator_result);
+                free(result);
+                break;
+            }
+        }
+    } while (!iterator_left->finished && !iterator_right->finished && !iterator_result->finished);
+
+    if (reshape_counter != 0) {
+        result->n_dim = result->n_dim - 1;
+        if (right_reshaped) {
+            result->shape.resize(&result->shape, result->shape._size - 1);
+            result->strides.resize(&result->strides, result->strides._size - 1);
+        } else {
+            int32_t shape_val = result->shape.get_at(&result->shape, result->shape._size - 1).val.i;
+            int32_t stride_val = result->strides.get_at(&result->strides, result->strides._size - 1).val.i;
+            result->shape.resize(&result->shape, result->shape._size - 1);
+            result->strides.resize(&result->strides, result->strides._size - 1);
+            result->shape.set_at(&result->shape, result->shape._size - 1, &shape_val);
+            result->strides.set_at(&result->strides, result->strides._size - 1, &stride_val);
+        }
+    }
+
+    dynarray_free(&left_batch_shape);
+    dynarray_free(&left_batch_strides);
+    dynarray_free(&right_batch_shape);
+    dynarray_free(&right_batch_strides);
+    dynarray_free(&out.left_strides);
+    dynarray_free(&out.result_shape);
+    dynarray_free(&out.right_strides);
+    free(iterator_left);
+    free(iterator_right);
+    free(iterator_result);
+    
+    return result;
 }
 
-tensor* tensor_matmul(const tensor* left, const tensor* right, pml_err_t* err) {
+tensor* tensor_matmul(tensor* left, tensor* right, pml_err_t* err) {
     if (left->type != right->type) {
         *err = PML_INCORRECT_INPUT;
         return NULL;
