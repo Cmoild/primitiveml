@@ -57,6 +57,8 @@ tensor* tensor_axis_mean(tensor* tensor, const size_t axis, pml_err_t* err);
 
 tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err);
 
+tensor* tensor_matmul(const tensor* left, const tensor* right, pml_err_t* err);
+
 typedef struct tensor_iterator {
     dynarray current_indices;
     void* data_ptr;

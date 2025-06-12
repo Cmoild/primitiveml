@@ -1007,3 +1007,188 @@ static void axis_operation_var(
 tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err) {
     return tensor_apply_unary_axis(tensor, axis, err, tensor->type, axis_operation_var);
 }
+
+static void tensor_matmul_2d_sum_helper(
+    void* result_element_ptr, void* left_row_ptr, void* right_col_ptr,
+    int32_t stride_col_left, int32_t stride_row_right,
+    int32_t shape_col_left,
+    size_t element_size, container_type_t type
+) {
+    for (size_t i = 0; i < shape_col_left; i++) {
+        if (i == 0) {
+            switch (type)
+            {
+            case TYPE_INT32:
+                *(int32_t*)result_element_ptr = *(int32_t*)left_row_ptr * *(int32_t*)right_col_ptr;
+                break;
+            case TYPE_FLOAT:
+                *(float*)result_element_ptr = *(float*)left_row_ptr * *(float*)right_col_ptr;
+                break;
+            default:
+                return;
+                break;
+            }
+        } else {
+            switch (type)
+            {
+            case TYPE_INT32:
+                *(int32_t*)result_element_ptr += *(int32_t*)(left_row_ptr + element_size * i * stride_col_left) \
+                    * *(int32_t*)(right_col_ptr + element_size * i * stride_row_right);
+                break;
+            case TYPE_FLOAT:
+                *(float*)result_element_ptr += *(float*)(left_row_ptr + element_size * i * stride_col_left) \
+                    * *(float*)(right_col_ptr + element_size * i * stride_row_right);
+                break;
+            default:
+                return;
+                break;
+            }
+        }
+    }
+}
+
+// Use pointers to left upper corner of matrices
+static void tensor_matmul_2d(
+    void* result_ptr, void* left_ptr, void* right_ptr,
+    int32_t stride_row_result, int32_t stride_col_result,
+    int32_t stride_row_left, int32_t stride_col_left,
+    int32_t stride_row_right, int32_t stride_col_right,
+    int32_t shape_row_result, int32_t shape_col_result,
+    int32_t shape_row_left, int32_t shape_col_left,
+    int32_t shape_row_right, int32_t shape_col_right,
+    container_type_t type, pml_err_t* err
+) {
+    size_t element_size = 0;
+    switch (type)
+    {
+    case TYPE_INT32:
+        element_size = sizeof(int32_t);
+        break;
+    case TYPE_FLOAT:
+        element_size = sizeof(float);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        return;
+        break;
+    }
+    for (size_t i = 0; i < (size_t)shape_row_left; i++) {
+        for (size_t j = 0; j < (size_t)shape_col_right; j++) {
+            tensor_matmul_2d_sum_helper(
+                result_ptr + i * element_size * stride_row_result + j * element_size * stride_col_result,
+                left_ptr + i * stride_row_left * element_size,
+                right_ptr + j * element_size * stride_col_right,
+                stride_col_left, stride_row_right,
+                shape_col_left, element_size, type
+            );
+        }
+    }
+}
+
+static tensor* tensor_apply_matmul(
+    const tensor* left, const tensor* right, const container_type_t type, pml_err_t* err
+) {
+    if (left->shape._size < 1 || right->shape._size < 1) {
+        *err = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+    tensor* result = NULL;
+    if (left->shape._size <= 2 && right->shape._size <= 2) {
+        int reshape_counter = 0;
+
+        int32_t shape_row_left;
+        int32_t shape_col_left;
+        int32_t stride_row_left;
+        int32_t stride_col_left;
+
+        if (left->shape._size == 1) {
+            shape_row_left = 1;
+            shape_col_left = *(int32_t*)left->shape._container;
+            stride_row_left = 0;
+            stride_col_left = *(int32_t*)left->strides._container;
+            reshape_counter++;
+        } else {
+            shape_row_left = *(int32_t*)left->shape._container;
+            shape_col_left = *(int32_t*)(left->shape._container + sizeof(int32_t));
+            stride_row_left = *(int32_t*)left->strides._container;
+            stride_col_left = *(int32_t*)(left->strides._container + sizeof(int32_t));
+        }
+
+        int32_t shape_row_right;
+        int32_t shape_col_right;
+        int32_t stride_row_right;
+        int32_t stride_col_right;
+
+        if (right->shape._size == 1) {
+            shape_row_right = *(int32_t*)right->shape._container;
+            shape_col_right = 1;
+            stride_row_right = *(int32_t*)right->strides._container;
+            stride_col_right = 0;
+            reshape_counter++;
+        } else {
+            shape_row_right = *(int32_t*)right->shape._container;
+            shape_col_right = *(int32_t*)(right->shape._container + sizeof(int32_t));
+            stride_row_right = *(int32_t*)right->strides._container;
+            stride_col_right = *(int32_t*)(right->strides._container + sizeof(int32_t));
+        }
+
+        if (shape_col_left != shape_row_right) {
+            *err = PML_INCORRECT_INPUT;
+            return NULL;
+        }
+
+        int32_t raw_result_shape[] = {shape_row_left, shape_col_right};
+        dynarray result_shape = dynarray_create(raw_result_shape, 2, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        result = tensor_create_zeros(type, 2, result_shape, err);
+        if (*err != PML_OK) {
+            dynarray_free(&result_shape);
+            return NULL;
+        }
+
+        int32_t stride_row_result = *(int32_t*)result->strides._container;
+        int32_t stride_col_result = *(int32_t*)(result->strides._container + sizeof(int32_t));
+
+        tensor_matmul_2d(
+            result->data, left->data, right->data,
+            stride_row_result, stride_col_result,
+            stride_row_left, stride_col_left,
+            stride_row_right, stride_col_right,
+            raw_result_shape[0], raw_result_shape[1],
+            shape_row_left, shape_col_left,
+            shape_row_right, shape_col_right,
+            type, err
+        );
+        if (*err != PML_OK) {
+            tensor_free(result);
+            free(result);
+            return NULL;
+        }
+
+        if (reshape_counter == 2) {
+            result->n_dim = 0;
+            result->shape.resize(&result->shape, 0);
+            result->strides.resize(&result->strides, 0);
+        } else if (reshape_counter == 1) {
+            result->n_dim = 1;
+            result->shape.resize(&result->shape, 1);
+            result->strides.resize(&result->strides, 1);
+            *(int32_t*)result->shape._container = 1;
+            *(int32_t*)result->strides._container = 1;
+        }
+
+        return result;
+    }
+    // Batch handling is not yet implemented
+    return NULL;
+}
+
+tensor* tensor_matmul(const tensor* left, const tensor* right, pml_err_t* err) {
+    if (left->type != right->type) {
+        *err = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+    return tensor_apply_matmul(left, right, left->type, err);
+}
