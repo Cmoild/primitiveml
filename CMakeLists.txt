@@ -12,6 +12,7 @@ add_library(pml_core
     src/tensor.c
     src/tensor_iterator.c
 )
+target_link_libraries(pml_core PRIVATE m)
 
 file(GLOB MAIN_SRC_FILES ${CMAKE_SOURCE_DIR}/src/main.c)
 add_executable(primitiveml ${MAIN_SRC_FILES})

@@ -21,7 +21,7 @@ tensor* tensor_create(
     const void* data,
     const size_t data_len,
     const container_type_t type, 
-    const size_t n_dimentions, 
+    const size_t n_dimensions, 
     const dynarray shape, 
     pml_err_t* error
 );
@@ -30,7 +30,7 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
 
 tensor* tensor_create_zeros(
     const container_type_t type, 
-    const size_t n_dimentions, 
+    const size_t n_dimensions, 
     const dynarray shape, 
     pml_err_t* error
 );
@@ -58,6 +58,22 @@ tensor* tensor_axis_mean(tensor* tensor, const size_t axis, pml_err_t* err);
 tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err);
 
 tensor* tensor_matmul(tensor* left, tensor* right, pml_err_t* err);
+
+tensor* tensor_sum(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_max(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_min(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_mean(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_var(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_sqrt(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_log(const tensor* tensor, pml_err_t* err);
+
+tensor* tensor_pow(const tensor* tensor, float exponent, pml_err_t* err);
 
 typedef struct tensor_iterator {
     dynarray current_indices;

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <math.h>
 
 
 static void tensor_print(const tensor* self);
@@ -11,7 +12,7 @@ tensor* tensor_create(
     const void* data,
     const size_t data_len,
     const container_type_t type, 
-    const size_t n_dimentions, 
+    const size_t n_dimensions, 
     const dynarray shape, 
     pml_err_t* error) {
     
@@ -26,7 +27,7 @@ tensor* tensor_create(
     tensor* tnsr = (tensor*)malloc(sizeof(tensor));
     tnsr->type = type;
     tnsr->shape = shape;
-    tnsr->n_dim = n_dimentions;
+    tnsr->n_dim = n_dimensions;
 
     pml_err_t err_strides = PML_OK;
     dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
@@ -36,8 +37,8 @@ tensor* tensor_create(
         free(tnsr);
         return NULL;
     }
-    if (n_dimentions != 0) {
-        err_strides = strides.resize(&strides, n_dimentions);
+    if (n_dimensions != 0) {
+        err_strides = strides.resize(&strides, n_dimensions);
         if (err_strides != PML_OK) {
             *error = err_strides;
             dynarray_free(&strides);
@@ -46,7 +47,7 @@ tensor* tensor_create(
         }
     }
     size_t n_elems = 1;
-    for (int i = n_dimentions - 1; i >= 0; i--) {
+    for (int i = n_dimensions - 1; i >= 0; i--) {
         strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
         result_t res_get = shape.get_at(&shape, (size_t)i);
         if (res_get.err != PML_OK) {
@@ -151,7 +152,7 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
 
 tensor* tensor_create_zeros(
     const container_type_t type, 
-    const size_t n_dimentions, 
+    const size_t n_dimensions, 
     const dynarray shape, 
     pml_err_t* error) {
     
@@ -162,7 +163,7 @@ tensor* tensor_create_zeros(
     tensor* tnsr = (tensor*)malloc(sizeof(tensor));
     tnsr->type = type;
     tnsr->shape = shape;
-    tnsr->n_dim = n_dimentions;
+    tnsr->n_dim = n_dimensions;
 
     pml_err_t err_strides = PML_OK;
     dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
@@ -172,8 +173,8 @@ tensor* tensor_create_zeros(
         free(tnsr);
         return NULL;
     }
-    if (n_dimentions != 0) {
-        err_strides = strides.resize(&strides, n_dimentions);
+    if (n_dimensions != 0) {
+        err_strides = strides.resize(&strides, n_dimensions);
         if (err_strides != PML_OK) {
             *error = err_strides;
             dynarray_free(&strides);
@@ -182,7 +183,7 @@ tensor* tensor_create_zeros(
         }
     }
     size_t n_elems = 1;
-    for (int i = n_dimentions - 1; i >= 0; i--) {
+    for (int i = n_dimensions - 1; i >= 0; i--) {
         strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
         result_t res_get = shape.get_at(&shape, (size_t)i);
         if (res_get.err != PML_OK) {
@@ -1483,4 +1484,247 @@ tensor* tensor_matmul(tensor* left, tensor* right, pml_err_t* err) {
         return NULL;
     }
     return tensor_apply_matmul(left, right, left->type, err);
+}
+
+tensor* tensor_sum(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_INT32:
+        int32_t res_i = 0;
+        int32_t* data_i = (int32_t*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_i += data_i[i];
+        }
+        result = tensor_create_scalar(&res_i, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    case TYPE_FLOAT:
+        float res_f = 0;
+        float* data_f = (float*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_f += data_f[i];
+        }
+        result = tensor_create_scalar(&res_f, TYPE_FLOAT, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_max(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_INT32:
+        int32_t* data_i = (int32_t*)tens->data;
+        int32_t res_i = data_i[0];
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_i = (data_i[i] > res_i) ? data_i[i] : res_i;
+        }
+        result = tensor_create_scalar(&res_i, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    case TYPE_FLOAT:
+        float* data_f = (float*)tens->data;
+        float res_f = data_f[0];
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_f = (data_f[i] > res_f) ? data_f[i] : res_f;
+        }
+        result = tensor_create_scalar(&res_f, TYPE_FLOAT, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_min(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_INT32:
+        int32_t* data_i = (int32_t*)tens->data;
+        int32_t res_i = data_i[0];
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_i = (data_i[i] < res_i) ? data_i[i] : res_i;
+        }
+        result = tensor_create_scalar(&res_i, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    case TYPE_FLOAT:
+        float* data_f = (float*)tens->data;
+        float res_f = data_f[0];
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_f = (data_f[i] < res_f) ? data_f[i] : res_f;
+        }
+        result = tensor_create_scalar(&res_f, TYPE_FLOAT, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_mean(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_INT32:
+        int32_t res_i = 0;
+        int32_t* data_i = (int32_t*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_i += data_i[i];
+        }
+        res_i /= (int32_t)tens->data_num_elems;
+        result = tensor_create_scalar(&res_i, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    case TYPE_FLOAT:
+        float res_f = 0;
+        float* data_f = (float*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_f += data_f[i];
+        }
+        res_f /= (float)tens->data_num_elems;
+        result = tensor_create_scalar(&res_f, TYPE_FLOAT, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_var(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_INT32:
+        int32_t res_i = 0;
+        int32_t res_i_2 = 0;
+        int32_t* data_i = (int32_t*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_i += data_i[i];
+            res_i_2 += data_i[i] * data_i[i];
+        }
+        res_i /= (int32_t)tens->data_num_elems;
+        res_i_2 /= (int32_t)tens->data_num_elems;
+        int32_t res_var_i = res_i_2 - res_i * res_i;
+        result = tensor_create_scalar(&res_var_i, TYPE_INT32, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    case TYPE_FLOAT:
+        float res_f = 0;
+        float res_f_2 = 0;
+        float* data_f = (float*)tens->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            res_f += data_f[i];
+            res_f_2 += data_f[i] * data_f[i];
+        }
+        res_f /= (float)tens->data_num_elems;
+        res_f_2 /= (float)tens->data_num_elems;
+        float res_var_f = res_f_2 - res_f * res_f;
+        result = tensor_create_scalar(&res_var_f, TYPE_FLOAT, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_sqrt(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_FLOAT:
+        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        float* data_f_init = (float*)tens->data;
+        float* data_f_res = (float*)result->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            data_f_res[i] = sqrtf(data_f_init[i]);
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_log(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_FLOAT:
+        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        float* data_f_init = (float*)tens->data;
+        float* data_f_res = (float*)result->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            data_f_res[i] = log(data_f_init[i]);
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+tensor* tensor_pow(const tensor* tens, float exponent, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_FLOAT:
+        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
+        if (*err != PML_OK) {
+            return NULL;
+        }
+        float* data_f_init = (float*)tens->data;
+        float* data_f_res = (float*)result->data;
+        for (size_t i = 0; i < tens->data_num_elems; i++) {
+            data_f_res[i] = powf(data_f_init[i], exponent);
+        }
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
 }
