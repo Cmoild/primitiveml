@@ -95,5 +95,5 @@ static void* tensor_iterator_get_next(tensor_iterator* self, const dynarray* sha
         }
         offset += dim_stride.val.i * self->element_size * dim_counter.val.i;
     }
-    return self->data_ptr + offset;
+    return (char*)self->data_ptr + offset;
 }

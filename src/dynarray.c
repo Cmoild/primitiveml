@@ -163,7 +163,7 @@ static void dynarray_print(const dynarray* self) {
 
 static result_t dynarray_get_at(const dynarray* self, const size_t idx) {
     result_t res;
-    if (idx >= self->_size || idx < 0) {
+    if (idx >= self->_size) {
         res.err = PML_OUT_OF_BOUNDS;
         return res;
     }
@@ -222,7 +222,7 @@ static pml_err_t dynarray_resize(dynarray* self, const size_t new_size) {
 
 static result_t dynarray_set_at(dynarray* self, const size_t idx, const void* value) {
     result_t res;
-    if (idx >= self->_size || idx < 0 || idx >= self->_capacity) {
+    if (idx >= self->_size || idx >= self->_capacity) {
         res.err = PML_OUT_OF_BOUNDS;
         return res;
     }

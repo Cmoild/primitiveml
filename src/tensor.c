@@ -246,7 +246,7 @@ static void print_helper(const tensor* self, size_t shape_idx, void* data) {
         if (stride.err != PML_OK) {
             return;
         }
-        for (size_t i = 0; i < dim_size.val.i; i++) {
+        for (size_t i = 0; i < (size_t)dim_size.val.i; i++) {
             switch (self->type)
             {
             case TYPE_INT32:
@@ -271,7 +271,7 @@ static void print_helper(const tensor* self, size_t shape_idx, void* data) {
         if (stride.err != PML_OK) {
             return;
         }
-        for (size_t i = 0; i < dim_size.val.i; i++) {
+        for (size_t i = 0; i < (size_t)dim_size.val.i; i++) {
             void* sub_data;
             switch (self->type)
             {
@@ -287,7 +287,7 @@ static void print_helper(const tensor* self, size_t shape_idx, void* data) {
                 break;
             }
             print_helper(self, shape_idx + 1, sub_data);
-            if (i < dim_size.val.i - 1) {
+            if (i < (size_t)(dim_size.val.i - 1)) {
                 printf(",\n");
             }
         }
@@ -332,7 +332,7 @@ void tensor_free(tensor* obj) {
 }
 
 bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err) {
-    for (int i = 0; i < left->shape._size && i < right->shape._size; i++) {
+    for (int i = 0; i < (size_t)left->shape._size && i < (size_t)right->shape._size; i++) {
         result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
         if (left_cur.err != PML_OK) {
             *err = left_cur.err;
@@ -379,7 +379,7 @@ tensor_broadcast_tensors(const tensor* left, const tensor* right, pml_err_t* err
     }
     // Tensors must be broadcastable at this moment (check it before calling this function)
     for (int i = 0; i < (int)max_n_dim; i++) {
-        if (i < left->shape._size && i < right->shape._size) {
+        if ((size_t)i < left->shape._size && (size_t)i < right->shape._size) {
             result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
             if (left_cur.err != PML_OK) {
                 *err = left_cur.err;
@@ -414,7 +414,7 @@ tensor_broadcast_tensors(const tensor* left, const tensor* right, pml_err_t* err
             }
             int32_t max_dim_size = (left_cur.val.i > right_cur.val.i) ? left_cur.val.i : right_cur.val.i;
             result_shape.set_at(&result_shape, result_shape._size - 1 - i, &max_dim_size);
-        } else if (i < left->shape._size && i >= right->shape._size) {
+        } else if ((size_t)i < left->shape._size && (size_t)i >= right->shape._size) {
             result_t left_cur = left->shape.get_at(&left->shape, left->shape._size - 1 - i); 
             if (left_cur.err != PML_OK) {
                 *err = left_cur.err;
@@ -429,7 +429,7 @@ tensor_broadcast_tensors(const tensor* left, const tensor* right, pml_err_t* err
             left_strides.set_at(&left_strides, left_strides._size - 1 - i, &left_stride_cur.val.i);
             right_strides.set_at(&right_strides, right_strides._size - 1 - i, &new_val);
             result_shape.set_at(&result_shape, result_shape._size - 1 - i, &left_cur.val.i);
-        } else if (i >= left->shape._size && i < right->shape._size) {
+        } else if ((size_t)i >= left->shape._size && (size_t)i < right->shape._size) {
             result_t right_cur = right->shape.get_at(&right->shape, right->shape._size - 1 - i);
             if (right_cur.err != PML_OK) {
                 *err = right_cur.err;
@@ -1008,7 +1008,7 @@ static void tensor_matmul_2d_sum_helper(
     int32_t shape_col_left,
     size_t element_size, container_type_t type
 ) {
-    for (size_t i = 0; i < shape_col_left; i++) {
+    for (size_t i = 0; i < (size_t)shape_col_left; i++) {
         if (i == 0) {
             switch (type)
             {
@@ -1026,12 +1026,12 @@ static void tensor_matmul_2d_sum_helper(
             switch (type)
             {
             case TYPE_INT32:
-                *(int32_t*)result_element_ptr += *(int32_t*)(left_row_ptr + element_size * i * stride_col_left) \
-                    * *(int32_t*)(right_col_ptr + element_size * i * stride_row_right);
+                *(int32_t*)result_element_ptr += *(int32_t*)((char*)left_row_ptr + element_size * i * stride_col_left) \
+                    * *(int32_t*)((char*)right_col_ptr + element_size * i * stride_row_right);
                 break;
             case TYPE_FLOAT:
-                *(float*)result_element_ptr += *(float*)(left_row_ptr + element_size * i * stride_col_left) \
-                    * *(float*)(right_col_ptr + element_size * i * stride_row_right);
+                *(float*)result_element_ptr += *(float*)((char*)left_row_ptr + element_size * i * stride_col_left) \
+                    * *(float*)((char*)right_col_ptr + element_size * i * stride_row_right);
                 break;
             default:
                 return;
@@ -1069,9 +1069,9 @@ static void tensor_matmul_2d(
     for (size_t i = 0; i < (size_t)shape_row_left; i++) {
         for (size_t j = 0; j < (size_t)shape_col_right; j++) {
             tensor_matmul_2d_sum_helper(
-                result_ptr + i * element_size * stride_row_result + j * element_size * stride_col_result,
-                left_ptr + i * stride_row_left * element_size,
-                right_ptr + j * element_size * stride_col_right,
+                (char*)result_ptr + i * element_size * stride_row_result + j * element_size * stride_col_result,
+                (char*)left_ptr + i * stride_row_left * element_size,
+                (char*)right_ptr + j * element_size * stride_col_right,
                 stride_col_left, stride_row_right,
                 shape_col_left, element_size, type
             );
@@ -1104,9 +1104,9 @@ static tensor* tensor_apply_matmul(
             reshape_counter++;
         } else {
             shape_row_left = *(int32_t*)left->shape._container;
-            shape_col_left = *(int32_t*)(left->shape._container + sizeof(int32_t));
+            shape_col_left = *(int32_t*)((char*)left->shape._container + sizeof(int32_t));
             stride_row_left = *(int32_t*)left->strides._container;
-            stride_col_left = *(int32_t*)(left->strides._container + sizeof(int32_t));
+            stride_col_left = *(int32_t*)((char*)left->strides._container + sizeof(int32_t));
         }
 
         int32_t shape_row_right;
@@ -1123,9 +1123,9 @@ static tensor* tensor_apply_matmul(
             right_reshaped = true;
         } else {
             shape_row_right = *(int32_t*)right->shape._container;
-            shape_col_right = *(int32_t*)(right->shape._container + sizeof(int32_t));
+            shape_col_right = *(int32_t*)((char*)right->shape._container + sizeof(int32_t));
             stride_row_right = *(int32_t*)right->strides._container;
-            stride_col_right = *(int32_t*)(right->strides._container + sizeof(int32_t));
+            stride_col_right = *(int32_t*)((char*)right->strides._container + sizeof(int32_t));
         }
 
         if (shape_col_left != shape_row_right) {
@@ -1145,7 +1145,7 @@ static tensor* tensor_apply_matmul(
         }
 
         int32_t stride_row_result = *(int32_t*)result->strides._container;
-        int32_t stride_col_result = *(int32_t*)(result->strides._container + sizeof(int32_t));
+        int32_t stride_col_result = *(int32_t*)((char*)result->strides._container + sizeof(int32_t));
 
         tensor_matmul_2d(
             result->data, left->data, right->data,
@@ -1263,7 +1263,7 @@ static tensor* tensor_apply_matmul(
     }
 
     for (int i = 2; i < batch_num_shape + 2; i++) {
-        if (i < left->shape._size) {
+        if (i < (int)left->shape._size) {
             int32_t shape_val = left->shape.get_at(&left->shape, left->shape._size - i - 1).val.i;
             int32_t stride_val = left->strides.get_at(&left->strides, left->strides._size - i - 1).val.i;
             left_batch_shape.set_at(
@@ -1277,7 +1277,7 @@ static tensor* tensor_apply_matmul(
                 &stride_val
             );
         }
-        if (i < right->shape._size) {
+        if (i < (int)right->shape._size) {
             int32_t shape_val = right->shape.get_at(&right->shape, right->shape._size - i - 1).val.i;
             int32_t stride_val = right->strides.get_at(&right->strides, right->strides._size - i - 1).val.i;
             right_batch_shape.set_at(
@@ -1342,11 +1342,11 @@ static tensor* tensor_apply_matmul(
         return NULL;
     }
 
-    for (int i = 0; i < result_shape._size; i++) {
+    for (int i = 0; i < (int)result_shape._size; i++) {
         if (i < batch_num_shape) {
             int32_t shape_val = out.result_shape.get_at(&out.result_shape, (size_t)i).val.i;
             result_shape.set_at(&result_shape, i, &shape_val);
-        } else if (i == result_shape._size - 2) {
+        } else if (i == (int)result_shape._size - 2) {
             result_shape.set_at(&result_shape, i, &shape_row_left);
         } else {
             result_shape.set_at(&result_shape, i, &shape_col_right);
