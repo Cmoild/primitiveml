@@ -8,13 +8,16 @@
 #include <stdbool.h>
 
 typedef struct tensor {
-	container_type_t type;
+    container_type_t type;
     size_t n_dim;
     dynarray shape;
     dynarray strides;
     void* data;
     size_t data_num_elems;
+    bool is_view;
     void (*print)(const struct tensor* self);
+    struct tensor* (*view)(const struct tensor* self, const dynarray shape, pml_err_t* err);
+    struct tensor* (*transpose)(const struct tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
 } tensor;
 
 tensor* tensor_create(

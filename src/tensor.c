@@ -8,6 +8,10 @@
 
 static void tensor_print(const tensor* self);
 
+static tensor* tensor_view(const tensor* self, const dynarray shape, pml_err_t* err);
+
+static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
+
 tensor* tensor_create(
     const void* data,
     const size_t data_len,
@@ -91,8 +95,11 @@ tensor* tensor_create(
         break;
     }
     tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
+    tnsr->is_view = false;
     return tnsr;
 }
 
@@ -106,6 +113,8 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
     tnsr->n_dim = 0;
     tnsr->data_num_elems = 1;
     tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
     switch (type) {
     case TYPE_INT32:
         tnsr->data = malloc(sizeof(int32_t));
@@ -147,6 +156,7 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
     }
     tnsr->shape = shape;
     tnsr->strides = strides;
+    tnsr->is_view = false;
     return tnsr;
 }
 
@@ -230,8 +240,117 @@ tensor* tensor_create_zeros(
         break;
     }
     tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
+    tnsr->is_view = false;
+    return tnsr;
+}
+
+static tensor* tensor_view(const tensor* self, const dynarray shape, pml_err_t* err) {
+    tensor* tnsr = (tensor*)malloc(sizeof(tensor));
+    tnsr->type = self->type;
+    tnsr->n_dim = shape._size;
+
+    pml_err_t err_strides = PML_OK;
+    dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
+    if (err_strides != PML_OK) {
+        *err = err_strides;
+        dynarray_free(&strides);
+        free(tnsr);
+        return NULL;
+    }
+    if (tnsr->n_dim != 0) {
+        err_strides = strides.resize(&strides, tnsr->n_dim);
+        if (err_strides != PML_OK) {
+            *err = err_strides;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+    }
+    size_t n_elems = 1;
+    for (int i = (int)tnsr->n_dim - 1; i >= 0; i--) {
+        strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
+        result_t res_get = shape.get_at(&shape, (size_t)i);
+        if (res_get.err != PML_OK) {
+            *err = PML_INCORRECT_INPUT;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+        n_elems *= (size_t)res_get.val.i;
+    }
+    if (n_elems == 0) {
+        *err = PML_EMPTY_TENSOR;
+        dynarray_free(&strides);
+        free(tnsr);
+        return NULL;
+    }
+    tnsr->shape = shape;
+    tnsr->data = self->data;
+    tnsr->data_num_elems = n_elems;
+    tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
+    tnsr->strides = strides;
+    tnsr->is_view = true;
+    return tnsr;
+}
+
+static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err) {
+    int32_t idx_left = idx1;
+    int32_t idx_right = idx2;
+    if (idx_left < 0) {
+        idx_left = self->n_dim + idx_left;
+    }
+    if (idx_right < 0) {
+        idx_right = self->n_dim + idx_right;
+    }
+    if (idx_left < 0 || idx_left >= self->n_dim) {
+        *err = PML_OUT_OF_BOUNDS;
+        return NULL;
+    }
+    if (idx_right < 0 || idx_right >= self->n_dim) {
+        *err = PML_OUT_OF_BOUNDS;
+        return NULL;
+    }
+
+    tensor* tnsr = (tensor*)malloc(sizeof(tensor));
+    tnsr->type = self->type;
+    tnsr->n_dim = self->n_dim;
+    tnsr->shape = dynarray_clone(&self->shape, err);
+    if (*err != PML_OK) {
+        printf("Error: %d\n", *err);
+        free(tnsr);
+        return NULL;
+    }
+    tnsr->data = self->data;
+    tnsr->data_num_elems = self->data_num_elems;
+    tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
+    tnsr->strides = dynarray_clone(&self->strides, err);
+    if (*err != PML_OK) {
+        dynarray_free(&tnsr->shape);
+        free(tnsr);
+        return NULL;
+    }
+    tnsr->is_view = true;
+
+    int32_t shape_left_swapped, shape_right_swapped;
+    shape_left_swapped = self->shape.get_at(&self->shape, (size_t)idx_right).val.i;
+    shape_right_swapped = self->shape.get_at(&self->shape, (size_t)idx_left).val.i;
+    tnsr->shape.set_at(&tnsr->shape, (size_t)idx_left, &shape_left_swapped);
+    tnsr->shape.set_at(&tnsr->shape, (size_t)idx_right, &shape_right_swapped);
+
+    int32_t stride_left_swapped, stride_right_swapped;
+    stride_left_swapped = self->strides.get_at(&self->strides, (size_t)idx_right).val.i;
+    stride_right_swapped = self->strides.get_at(&self->strides, (size_t)idx_left).val.i;
+    tnsr->strides.set_at(&tnsr->strides, (size_t)idx_left, &stride_left_swapped);
+    tnsr->strides.set_at(&tnsr->strides, (size_t)idx_right, &stride_right_swapped);
+
     return tnsr;
 }
 
@@ -326,7 +445,7 @@ static void tensor_print(const tensor* self) {
 void tensor_free(tensor* obj) {
     dynarray_free(&obj->shape);
     dynarray_free(&obj->strides);
-    if (obj->data) {
+    if (obj->data && !obj->is_view) {
         free(obj->data);
     }
 }
