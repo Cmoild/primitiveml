@@ -44,6 +44,8 @@ bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
 
 tensor* tensor_add(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
 
+tensor* tensor_max_binary(tensor* left, tensor* right, pml_err_t* err);
+
 tensor* tensor_subtract(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
 
 tensor* tensor_multiply(tensor* left, tensor* right, container_type_t type, pml_err_t* err);

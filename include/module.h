@@ -8,6 +8,7 @@ typedef struct module_iface {
     tensor* (*forward)(const void* self, const tensor* input);
     void (*destroy)(void* self);
     void (*from_file)(const void* self, const char* path);
+    void (*print)(const void* self);
 
 } module_iface;
 

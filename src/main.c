@@ -3,40 +3,43 @@
 #include <tensor.h>
 #include <stdlib.h>
 #include <module.h>
+#include <linear.h>
 
 
 int main(){
     pml_err_t err = PML_OK;
-    int32_t shape_init_raw[] = {2,3,4};
-    dynarray shape_init = dynarray_create(shape_init_raw, 3, TYPE_INT32, &err);
-    float data[] = {
-        0.1f, 0.2f, 0.3f, 0.4f,
-        0.5f, 0.6f, 0.7f, 0.8f,
-        0.9f, 0.01f, 0.02f, 0.03f,
-        0.04f, 0.05f, 0.06f, 0.07f,
-        0.08f, 0.09f, 0.11f, 0.12f,
-        0.13f, 0.14f, 0.15f, 0.16f,
-    };
-    tensor* W = tensor_create(data, 24, TYPE_FLOAT, 3, shape_init, &err);
-    W->print(W);
-    
-    int32_t shape_view_raw[] = {2,3,2,2};
-    dynarray shape_view = dynarray_create(shape_view_raw, 4, TYPE_INT32, &err);
-    tensor* w_heads = W->view(W, shape_view, &err);
-    w_heads->print(w_heads);
+    int32_t shape_bias_raw[] = {5};
+    dynarray shape_bias = dynarray_create(shape_bias_raw, 1, TYPE_INT32, &err);
+    float bias_raw[5] = {-3.7451, -4.8251, -5.6107, -1.8519, -2.2098};
+    tensor* bias = tensor_create(bias_raw, 5, TYPE_FLOAT, 1, shape_bias, &err);
 
-    w_heads = w_heads->transpose(w_heads, -2, -3, &err);
+    int32_t shape_weights_raw[] = {5, 1};
+    dynarray shape_weights = dynarray_create(shape_weights_raw, 2, TYPE_INT32, &err);
+    float weights_raw[] = {-1.6920, 1.6244, -1.5764, -2.3538, 2.2618};
+    tensor* weights = tensor_create(weights_raw, 5, TYPE_FLOAT, 2, shape_weights, &err);
 
-    w_heads->print(w_heads);
+    dynarray shape_input = dynarray_create((int32_t[]){1}, 1, TYPE_INT32, &err);
+    tensor* input = tensor_create((float[]){2.}, 1, TYPE_FLOAT, 1, shape_input, &err);
 
-    // float ex_raw[] = {1, 2, 3, 4};
-    // int32_t shape_ex_raw[] = {2, 2};
-    // dynarray shape_ex = dynarray_create(shape_ex_raw, 2, TYPE_INT32, &err);
-    // tensor* ex = tensor_create(ex_raw, 4, TYPE_FLOAT, 2, shape_ex, &err);
-    // ex->print(ex);
+    linear_module* fc = linear_module_create(weights, bias, &err);
 
-    // tensor* res = tensor_matmul(w_heads, ex, &err);
-    // res->print(res);
+    tensor* output1 = fc->module_base.forward(fc, input);
+
+    tensor* zero = tensor_create_scalar((float[]){0.}, TYPE_FLOAT, &err);
+
+    tensor* output2 = tensor_max_binary(output1, zero, &err);
+
+    dynarray shape_bias2 = dynarray_create((int32_t[]){1}, 1, TYPE_INT32, &err);
+    tensor* bias2 = tensor_create((float[]){0.2878}, 1, TYPE_FLOAT, 1, shape_bias2, &err);
+
+    dynarray shape_weights2 = dynarray_create((int32_t[]){1, 5}, 2, TYPE_INT32, &err);
+    tensor* weights2 = tensor_create((float[]){1.6556, 2.4228, 1.7815, 1.2710, 1.7468}, 5, TYPE_FLOAT, 2, shape_weights2, &err);
+
+    linear_module* fc2 = linear_module_create(weights2, bias2, &err);
+
+    tensor* output3 = fc2->module_base.forward(fc2, output2);
+
+    output3->print(output3);
 
     return 0;
 }

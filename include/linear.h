@@ -10,6 +10,6 @@ typedef struct linear_module {
     tensor* b;
 } linear_module;
 
-linear_module* linear_module_create(tensor* W, tensor* b);
+linear_module* linear_module_create(tensor* W, tensor* b, pml_err_t* err);
 
 #endif // LINEAR_MODULE_H

@@ -674,6 +674,27 @@ tensor* tensor_add(tensor* left, tensor* right, container_type_t type, pml_err_t
     return tensor_apply_elementwise_operation(left, right, err, type, tensor_add_operation);
 }
 
+static void tensor_max_binary_operation(void* result_ptr, void* left_ptr, void* right_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_INT32:
+        int32_t* result_ptr_i = result_ptr;
+        *result_ptr_i = (*(int32_t*)left_ptr > *(int32_t*)right_ptr) ? *(int32_t*)left_ptr : *(int32_t*)right_ptr;
+        break;
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = (*(float*)left_ptr > *(float*)right_ptr) ? *(float*)left_ptr : *(float*)right_ptr;
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+tensor* tensor_max_binary(tensor* left, tensor* right, pml_err_t* err) {
+    return tensor_apply_elementwise_operation(left, right, err, left->type, tensor_max_binary_operation);
+}
+
 static void tensor_subtract_operation(void* result_ptr, void* left_ptr, void* right_ptr, container_type_t type, pml_err_t* err) {
     switch (type)
     {

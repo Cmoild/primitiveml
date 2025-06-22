@@ -6,16 +6,19 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_subdirectory(core)
 
-include_directories(primitiveml include/)
-
 add_library(pml
     src/linear.c
 )
 
+target_include_directories(pml
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/core/include
+)
+
 file(GLOB MAIN_SRC_FILES ${CMAKE_SOURCE_DIR}/src/main.c)
 add_executable(primitiveml ${MAIN_SRC_FILES})
-target_link_libraries(primitiveml PRIVATE pml_core)
-target_link_libraries(primitiveml PRIVATE pml)
+target_link_libraries(primitiveml PRIVATE pml_core pml)
 
 enable_testing()
 
