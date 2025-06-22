@@ -2,6 +2,7 @@
 #include <dynarray.h>
 #include <tensor.h>
 #include <stdlib.h>
+#include <module.h>
 
 
 int main(){
