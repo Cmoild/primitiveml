@@ -1964,6 +1964,33 @@ tensor* tensor_log(const tensor* tens, pml_err_t* err) {
     return result;
 }
 
+static void tensor_exp_unary_operation(void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = expf(*(float*)input_ptr);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+tensor* tensor_exp(const tensor* tens, pml_err_t* err) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_FLOAT:
+        result = tensor_apply_elementwise_unary_operation(tens, err, TYPE_FLOAT, tensor_exp_unary_operation);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
 static tensor* tensor_apply_elementwise_unary_pow(
     const tensor* input, float exponent, pml_err_t* err, container_type_t type,
     void (*unary_pow)(void* result_ptr, void* input_ptr, float exponent, container_type_t type, pml_err_t* err)
