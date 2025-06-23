@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <module.h>
 #include <linear.h>
+#include <functional.h>
 
 
 int main(){
@@ -19,15 +20,13 @@ int main(){
     tensor* weights = tensor_create(weights_raw, 5, TYPE_FLOAT, 2, shape_weights, &err);
 
     dynarray shape_input = dynarray_create((int32_t[]){1}, 1, TYPE_INT32, &err);
-    tensor* input = tensor_create((float[]){2.}, 1, TYPE_FLOAT, 1, shape_input, &err);
+    tensor* input = tensor_create((float[]){5.}, 1, TYPE_FLOAT, 1, shape_input, &err);
 
     linear_module* fc = linear_module_create(weights, bias, &err);
 
     tensor* output1 = fc->module_base.forward(fc, input);
 
-    tensor* zero = tensor_create_scalar((float[]){0.}, TYPE_FLOAT, &err);
-
-    tensor* output2 = tensor_max_binary(output1, zero, &err);
+    tensor* output2 = relu(output1, &err);
 
     dynarray shape_bias2 = dynarray_create((int32_t[]){1}, 1, TYPE_INT32, &err);
     tensor* bias2 = tensor_create((float[]){0.2878}, 1, TYPE_FLOAT, 1, shape_bias2, &err);

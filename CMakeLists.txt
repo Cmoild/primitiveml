@@ -8,6 +8,7 @@ add_subdirectory(core)
 
 add_library(pml
     src/linear.c
+    src/functional.c
 )
 
 target_include_directories(pml
