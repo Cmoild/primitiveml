@@ -6,4 +6,6 @@
 
 tensor* relu(const tensor* input, pml_err_t* err);
 
+tensor* sigmoid(const tensor* input, pml_err_t* err);
+
 #endif // FUNCTIONAL_HEADER_FILE

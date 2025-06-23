@@ -17,6 +17,8 @@ target_include_directories(pml
         ${PROJECT_SOURCE_DIR}/core/include
 )
 
+target_link_libraries(pml PRIVATE m)
+
 file(GLOB MAIN_SRC_FILES ${CMAKE_SOURCE_DIR}/src/main.c)
 add_executable(primitiveml ${MAIN_SRC_FILES})
 target_link_libraries(primitiveml PRIVATE pml_core pml)

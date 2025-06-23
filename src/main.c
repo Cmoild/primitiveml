@@ -14,13 +14,17 @@ float custom(float x){
 
 int main(){
     pml_err_t err = PML_OK;
-    int32_t shape_bias_raw[] = {5};
-    dynarray shape_bias = dynarray_create(shape_bias_raw, 1, TYPE_INT32, &err);
-    float bias_raw[5] = {-3.7451, -4.8251, -5.6107, -1.8519, -2.2098};
-    tensor* bias = tensor_create(bias_raw, 5, TYPE_FLOAT, 1, shape_bias, &err);
+    // int32_t shape_bias_raw[] = {5};
+    // dynarray shape_bias = dynarray_create(shape_bias_raw, 1, TYPE_INT32, &err);
+    // float bias_raw[5] = {-3.7451, -4.8251, -5.6107, -1.8519, -2.2098};
+    // tensor* bias = tensor_create(bias_raw, 5, TYPE_FLOAT, 1, shape_bias, &err);
 
-    tensor* test_custom = tensor_float_custom_elementwise_unary_operation(bias, &err, custom);
-    test_custom->print(test_custom);
+    dynarray shape_test = dynarray_create((int32_t[]){2, 3}, 2, TYPE_INT32, &err);
+    tensor* test = tensor_create((float[]){1., 2., 3., 4., 5., 6.}, 6, TYPE_FLOAT, 2, shape_test, &err);
+
+    tensor* s = sigmoid(test, &err);
+    s->print(s);
+
 
     // int32_t shape_weights_raw[] = {5, 1};
     // dynarray shape_weights = dynarray_create(shape_weights_raw, 2, TYPE_INT32, &err);
