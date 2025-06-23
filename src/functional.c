@@ -15,7 +15,7 @@ tensor* relu(const tensor* input, pml_err_t* err) {
 }
 
 float scalar_sigmoid(float x) {
-    return 1. / (1. + expf(-x));
+    return 1.f / (1.f + expf(-x));
 }
 
 tensor* sigmoid(const tensor* input, pml_err_t* err) {

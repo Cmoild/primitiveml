@@ -18,6 +18,7 @@ typedef struct tensor {
     void (*print)(const struct tensor* self);
     struct tensor* (*view)(const struct tensor* self, const dynarray shape, pml_err_t* err);
     struct tensor* (*transpose)(const struct tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
+    struct tensor* (*unsqueeze)(const struct tensor* self, const int32_t idx, pml_err_t* err);
 } tensor;
 
 tensor* tensor_create(
