@@ -80,6 +80,11 @@ tensor* tensor_log(const tensor* tensor, pml_err_t* err);
 
 tensor* tensor_pow(const tensor* tensor, float exponent, pml_err_t* err);
 
+tensor* tensor_float_custom_elementwise_unary_operation(
+    const tensor* tens, pml_err_t* err, 
+    float (*operation)(float __x)
+);
+
 typedef struct tensor_iterator {
     dynarray current_indices;
     void* data_ptr;

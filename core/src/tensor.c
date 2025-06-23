@@ -1803,26 +1803,94 @@ tensor* tensor_var(const tensor* tens, pml_err_t* err) {
     return result;
 }
 
+static tensor* tensor_apply_elementwise_unary_operation(
+    const tensor* input, pml_err_t* err, container_type_t type,
+    void (*unary_operation)(void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err)
+) {
+    *err = PML_OK;
+    tensor* result;
+
+    dynarray result_shape = dynarray_clone(&input->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    result = tensor_create_zeros(type, input->shape._size, result_shape, err);
+    if (*err != PML_OK) {
+        dynarray_free(&result_shape);
+        return NULL;
+    }
+    tensor_iterator* iterator_input = tensor_iterator_create(input, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        free(iterator_input);
+        return NULL;
+    }
+    do {
+        void* input_ptr = iterator_input->get_next(iterator_input, &input->shape, &input->strides, err);
+        void* result_ptr = iterator_result->get_next(iterator_result, &result->shape, &result->strides, err);
+        if (input_ptr && result_ptr) {
+            unary_operation(result_ptr, input_ptr, type, err);
+            if (*err != PML_OK) {
+                tensor_free(result);
+                free(result);
+                break;
+            }
+            // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
+        }
+    } while (!iterator_input->finished && !iterator_result->finished);
+    tensor_iterator_free(iterator_input);
+    free(iterator_input);
+    tensor_iterator_free(iterator_result);
+    free(iterator_result);
+
+    return result;
+}
+
+static void tensor_sqrt_unary_operation(void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = sqrtf(*(float*)input_ptr);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
 tensor* tensor_sqrt(const tensor* tens, pml_err_t* err) {
     tensor* result;
     switch (tens->type)
     {
     case TYPE_FLOAT:
-        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
-        if (*err != PML_OK) {
-            return NULL;
-        }
-        float* data_f_init = (float*)tens->data;
-        float* data_f_res = (float*)result->data;
-        for (size_t i = 0; i < tens->data_num_elems; i++) {
-            data_f_res[i] = sqrtf(data_f_init[i]);
-        }
+        result = tensor_apply_elementwise_unary_operation(tens, err, TYPE_FLOAT, tensor_sqrt_unary_operation);
         break;
     default:
         *err = PML_WRONG_TYPE;
         break;
     }
     return result;
+}
+
+static void tensor_log_unary_operation(void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = logf(*(float*)input_ptr);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
 }
 
 tensor* tensor_log(const tensor* tens, pml_err_t* err) {
@@ -1830,15 +1898,7 @@ tensor* tensor_log(const tensor* tens, pml_err_t* err) {
     switch (tens->type)
     {
     case TYPE_FLOAT:
-        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
-        if (*err != PML_OK) {
-            return NULL;
-        }
-        float* data_f_init = (float*)tens->data;
-        float* data_f_res = (float*)result->data;
-        for (size_t i = 0; i < tens->data_num_elems; i++) {
-            data_f_res[i] = log(data_f_init[i]);
-        }
+        result = tensor_apply_elementwise_unary_operation(tens, err, TYPE_FLOAT, tensor_log_unary_operation);
         break;
     default:
         *err = PML_WRONG_TYPE;
@@ -1847,20 +1907,159 @@ tensor* tensor_log(const tensor* tens, pml_err_t* err) {
     return result;
 }
 
+static tensor* tensor_apply_elementwise_unary_pow(
+    const tensor* input, float exponent, pml_err_t* err, container_type_t type,
+    void (*unary_pow)(void* result_ptr, void* input_ptr, float exponent, container_type_t type, pml_err_t* err)
+) {
+    *err = PML_OK;
+    tensor* result;
+
+    dynarray result_shape = dynarray_clone(&input->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    result = tensor_create_zeros(type, input->shape._size, result_shape, err);
+    if (*err != PML_OK) {
+        dynarray_free(&result_shape);
+        return NULL;
+    }
+    tensor_iterator* iterator_input = tensor_iterator_create(input, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        free(iterator_input);
+        return NULL;
+    }
+    do {
+        void* input_ptr = iterator_input->get_next(iterator_input, &input->shape, &input->strides, err);
+        void* result_ptr = iterator_result->get_next(iterator_result, &result->shape, &result->strides, err);
+        if (input_ptr && result_ptr) {
+            unary_pow(result_ptr, input_ptr, exponent, type, err);
+            if (*err != PML_OK) {
+                tensor_free(result);
+                free(result);
+                break;
+            }
+            // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
+        }
+    } while (!iterator_input->finished && !iterator_result->finished);
+    tensor_iterator_free(iterator_input);
+    free(iterator_input);
+    tensor_iterator_free(iterator_result);
+    free(iterator_result);
+
+    return result;
+}
+
+static void tensor_pow_unary_operation(void* result_ptr, void* input_ptr, float exponent, container_type_t type, pml_err_t* err) {
+    switch (type)
+    {
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = powf(*(float*)input_ptr, exponent);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
 tensor* tensor_pow(const tensor* tens, float exponent, pml_err_t* err) {
     tensor* result;
     switch (tens->type)
     {
     case TYPE_FLOAT:
-        result = tensor_create_zeros(TYPE_FLOAT, tens->n_dim, tens->shape, err);
-        if (*err != PML_OK) {
-            return NULL;
+        result = tensor_apply_elementwise_unary_pow(tens, exponent, err, TYPE_FLOAT, tensor_pow_unary_operation);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+    return result;
+}
+
+static tensor* tensor_apply_elementwise_unary_custom_float_operation(
+    const tensor* input, pml_err_t* err, container_type_t type,
+    void (*unary_operation)(void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err, float (*custom_float_operation)(float __x)),
+    float (*custom_float_operation)(float __x)
+) {
+    *err = PML_OK;
+    tensor* result;
+
+    dynarray result_shape = dynarray_clone(&input->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    result = tensor_create_zeros(type, input->shape._size, result_shape, err);
+    if (*err != PML_OK) {
+        dynarray_free(&result_shape);
+        return NULL;
+    }
+    tensor_iterator* iterator_input = tensor_iterator_create(input, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        free(iterator_input);
+        return NULL;
+    }
+    do {
+        void* input_ptr = iterator_input->get_next(iterator_input, &input->shape, &input->strides, err);
+        void* result_ptr = iterator_result->get_next(iterator_result, &result->shape, &result->strides, err);
+        if (input_ptr && result_ptr) {
+            unary_operation(result_ptr, input_ptr, type, err, custom_float_operation);
+            if (*err != PML_OK) {
+                tensor_free(result);
+                free(result);
+                break;
+            }
+            // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
         }
-        float* data_f_init = (float*)tens->data;
-        float* data_f_res = (float*)result->data;
-        for (size_t i = 0; i < tens->data_num_elems; i++) {
-            data_f_res[i] = powf(data_f_init[i], exponent);
-        }
+    } while (!iterator_input->finished && !iterator_result->finished);
+    tensor_iterator_free(iterator_input);
+    free(iterator_input);
+    tensor_iterator_free(iterator_result);
+    free(iterator_result);
+
+    return result;
+}
+
+static void tensor_custom_unary_operation(
+    void* result_ptr, void* input_ptr, container_type_t type, pml_err_t* err,
+    float (*custom_float_operation)(float __x)
+) {
+    switch (type)
+    {
+    case TYPE_FLOAT:
+        float* result_ptr_f = result_ptr;
+        *result_ptr_f = custom_float_operation(*(float*)input_ptr);
+        break;
+    default:
+        *err = PML_WRONG_TYPE;
+        break;
+    }
+}
+
+tensor* tensor_float_custom_elementwise_unary_operation(
+    const tensor* tens, pml_err_t* err, 
+    float (*operation)(float __x)
+) {
+    tensor* result;
+    switch (tens->type)
+    {
+    case TYPE_FLOAT:
+        result = tensor_apply_elementwise_unary_custom_float_operation(tens, err, TYPE_FLOAT, tensor_custom_unary_operation, operation);
         break;
     default:
         *err = PML_WRONG_TYPE;
