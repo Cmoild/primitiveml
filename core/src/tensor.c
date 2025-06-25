@@ -317,7 +317,6 @@ static tensor* tensor_slice(const tensor* self, const index_tuple_t slices, pml_
         *err = PML_OUT_OF_BOUNDS;
         return NULL;
     }
-    // удаляем ось и страйд в случае одиночного индекса
     char* new_data_ptr = self->data;
     size_t element_size;
     switch (self->type)
