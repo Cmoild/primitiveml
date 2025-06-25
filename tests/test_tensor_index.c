@@ -2,9 +2,6 @@
 #include <dynarray.h>
 #include <tensor.h>
 #include <stdlib.h>
-#include <module.h>
-#include <linear.h>
-#include <functional.h>
 #include <tensor_index.h>
 
 

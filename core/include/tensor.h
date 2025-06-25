@@ -6,6 +6,7 @@
 #include <container_type.h>
 #include <dynarray.h>
 #include <stdbool.h>
+#include <tensor_index.h>
 
 typedef struct tensor {
     container_type_t type;
@@ -19,6 +20,7 @@ typedef struct tensor {
     struct tensor* (*view)(const struct tensor* self, const dynarray shape, pml_err_t* err);
     struct tensor* (*transpose)(const struct tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
     struct tensor* (*unsqueeze)(const struct tensor* self, const int32_t idx, pml_err_t* err);
+    struct tensor* (*slice)(const struct tensor* self, const index_tuple_t slices, pml_err_t* err);
 } tensor;
 
 tensor* tensor_create(
@@ -63,7 +65,7 @@ tensor* tensor_axis_mean(tensor* tensor, const size_t axis, pml_err_t* err);
 
 tensor* tensor_axis_var(tensor* tensor, const size_t axis, pml_err_t* err);
 
-tensor* tensor_matmul(tensor* left, tensor* right, pml_err_t* err);
+tensor* tensor_matmul(const tensor* left, const tensor* right, pml_err_t* err);
 
 tensor* tensor_sum(const tensor* tensor, pml_err_t* err);
 
@@ -97,7 +99,7 @@ typedef struct tensor_iterator {
     void* (*get_next)(struct tensor_iterator* self, const dynarray* shape, const dynarray* strides, pml_err_t* err);
 } tensor_iterator;
 
-tensor_iterator* tensor_iterator_create(tensor* obj, pml_err_t* err);
+tensor_iterator* tensor_iterator_create(const tensor* obj, pml_err_t* err);
 
 void tensor_iterator_free(tensor_iterator* obj);
 

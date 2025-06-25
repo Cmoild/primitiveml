@@ -14,6 +14,8 @@ static pml_err_t dynarray_resize(dynarray* self, const size_t new_size);
 
 static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void* value);
 
+static result_t dynarray_delete_at(dynarray* self, const size_t idx);
+
 dynarray dynarray_create(const void *data, const size_t len, const container_type_t type, pml_err_t *error) {
     dynarray vector = {
         .get_at = dynarray_get_at,
@@ -21,6 +23,7 @@ dynarray dynarray_create(const void *data, const size_t len, const container_typ
         .set_at = dynarray_set_at,
         .resize = dynarray_resize,
         .insert_at = dynarray_insert_at,
+        .delete_at = dynarray_delete_at,
     };
     switch (type) {
     case TYPE_INT32:
@@ -69,6 +72,7 @@ dynarray dynarray_clone(const dynarray* obj, pml_err_t *error) {
         .resize = dynarray_resize,
         .set_at = dynarray_set_at,
         .insert_at = dynarray_insert_at,
+        .delete_at = dynarray_delete_at,
         .type = obj->type,
         ._capacity = obj->_capacity,
         ._size = obj->_size,
@@ -107,6 +111,7 @@ dynarray dynarray_zeros(const size_t len, const container_type_t type, pml_err_t
         .resize = dynarray_resize,
         .set_at = dynarray_set_at,
         .insert_at = dynarray_insert_at,
+        .delete_at = dynarray_delete_at,
         .type = type,
         ._capacity = len,
         ._size = len,
@@ -304,6 +309,54 @@ static result_t dynarray_insert_at(dynarray* self, const size_t idx, const void*
         break;
     }
     self->_size++;
+    res.err = PML_OK;
+    return res;
+}
+
+static result_t dynarray_delete_at(dynarray* self, const size_t idx) {
+    result_t res;
+    if (idx >= self->_size && self->_size > 0) {
+        res.err = PML_OUT_OF_BOUNDS;
+        return res;
+    }
+    if (self->_size == 0) {
+        if (idx > 0) {
+            res.err = PML_OUT_OF_BOUNDS;
+            return res;
+        }
+        res.err = PML_OK;
+        return res;
+    }
+
+    switch (self->type)
+    {
+    case TYPE_INT32:
+
+        int32_t* cont_i = (int32_t*)self->_container;
+        res.val.i = cont_i[idx];
+        res.type = TYPE_INT32;
+        for (size_t i = idx; i < self->_size - 1; i++) {
+            cont_i[i] = cont_i[i + 1];
+        }
+
+        break;
+    case TYPE_FLOAT:
+
+        float* cont_f = (float*)self->_container;
+        res.val.f = cont_f[idx];
+        res.type = TYPE_FLOAT;
+        for (size_t i = idx; i < self->_size - 1; i++) {
+            cont_f[i] = cont_f[i + 1];
+        }
+
+        break;
+    default:
+        printf("Type is not supported\n");
+        res.err = PML_WRONG_TYPE;
+        return res;
+        break;
+    }
+    self->_size--;
     res.err = PML_OK;
     return res;
 }

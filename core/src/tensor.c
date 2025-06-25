@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#include <tensor_index.h>
 
 
 static void tensor_print(const tensor* self);
@@ -13,6 +14,8 @@ static tensor* tensor_view(const tensor* self, const dynarray shape, pml_err_t* 
 static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
 
 static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t* err);
+
+static tensor* tensor_slice(const tensor* self, const index_tuple_t slices, pml_err_t* err);
 
 tensor* tensor_create(
     const void* data,
@@ -100,6 +103,7 @@ tensor* tensor_create(
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
     tnsr->is_view = false;
@@ -119,6 +123,7 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     switch (type) {
     case TYPE_INT32:
         tnsr->data = malloc(sizeof(int32_t));
@@ -247,6 +252,7 @@ tensor* tensor_create_zeros(
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
     tnsr->is_view = false;
@@ -300,9 +306,127 @@ static tensor* tensor_view(const tensor* self, const dynarray shape, pml_err_t* 
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     tnsr->strides = strides;
     tnsr->is_view = true;
     return tnsr;
+}
+
+static tensor* tensor_slice(const tensor* self, const index_tuple_t slices, pml_err_t* err) {
+    if (slices.len > self->n_dim || self->n_dim == 0) {
+        *err = PML_OUT_OF_BOUNDS;
+        return NULL;
+    }
+    // удаляем ось и страйд в случае одиночного индекса
+    char* new_data_ptr = self->data;
+    size_t element_size;
+    switch (self->type)
+    {
+    case TYPE_INT32:
+        element_size = sizeof(int32_t);
+        break;
+    case TYPE_FLOAT:
+        element_size = sizeof(float);
+        break;
+    default:
+        printf("Type is not supported\n");
+        *err = PML_WRONG_TYPE;
+        return NULL;
+        break;
+    }
+    size_t offset = 0;
+    for (size_t i = 0; i < slices.len; i++) {
+        tensor_index_t cur_slice = slices.items[i];
+        int32_t cur_stride = self->strides.get_at(&self->strides, i).val.i;
+        int32_t cur_shape = self->shape.get_at(&self->shape, i).val.i;
+        switch (cur_slice.type)
+        {
+        case IDX_SLICE:
+            if ((cur_slice.value.slice.start >= cur_shape) || \
+                (cur_slice.value.slice.start < 0 && cur_shape + cur_slice.value.slice.start < 0) || \
+                (cur_slice.value.slice.end > cur_shape) || \
+                (cur_slice.value.slice.end < 0 && cur_shape + cur_slice.value.slice.end < 0)) {
+                *err = PML_OUT_OF_BOUNDS;
+                return NULL;
+            }
+            if (cur_slice.value.slice.start < 0) {
+                cur_slice.value.slice.start = cur_shape + cur_slice.value.slice.start;
+            }
+            if (cur_slice.value.slice.end < 0) {
+                cur_slice.value.slice.end = cur_shape + cur_slice.value.slice.end;
+            }
+            if (cur_slice.value.slice.end - cur_slice.value.slice.start < 0) {
+                *err = PML_INCORRECT_INPUT;
+                return NULL;
+            } else if (cur_slice.value.slice.end - cur_slice.value.slice.start == 0) {
+                *err = PML_EMPTY_TENSOR;
+                return NULL;
+            }
+            offset += cur_stride * element_size * cur_slice.value.slice.start;
+            break;
+        case IDX_INT:
+            if ((cur_slice.value.index < 0 && cur_shape + cur_slice.value.index < 0) || \
+                (cur_slice.value.index >= cur_shape)) {
+                *err = PML_OUT_OF_BOUNDS;
+                return NULL;
+            }
+            if (cur_slice.value.index < 0) {
+                cur_slice.value.index = cur_shape + cur_slice.value.index;
+            }
+            offset += cur_stride * element_size * cur_slice.value.index;
+            break;
+        default:
+            *err = PML_WRONG_TYPE;
+            return NULL;
+            break;
+        }
+    }
+    dynarray new_shape = dynarray_clone(&self->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    dynarray new_strides = dynarray_clone(&self->strides, err);
+    if (*err != PML_OK) {
+        dynarray_free(&new_shape);
+        return NULL;
+    }
+    size_t out_n_dim = self->n_dim;
+    for (int i = (int)slices.len - 1; i >= 0; i--) {
+        tensor_index_t cur_slice = slices.items[i];
+        if (cur_slice.type == IDX_INT) {
+            new_shape.delete_at(&new_shape, (size_t)i);
+            new_strides.delete_at(&new_strides, (size_t)i);
+            out_n_dim--;
+        } else if (cur_slice.type == IDX_SLICE) {
+            int32_t cur_new_shape = cur_slice.value.slice.end - cur_slice.value.slice.start;
+            new_shape.set_at(&new_shape, i, &cur_new_shape);
+        }
+    }
+    size_t out_num_elems = 1;
+    for (size_t i = 0; i < new_shape._size; i++) {
+        out_num_elems *= (size_t)new_shape.get_at(&new_shape, i).val.i;
+    }
+    tensor* out = (tensor*)malloc(sizeof(tensor));
+    if (!out) {
+        dynarray_free(&new_shape);
+        dynarray_free(&new_strides);
+        *err = PML_OUT_OF_MEMORY;
+        return NULL;
+    }
+    out->data = new_data_ptr + offset;
+    out->data_num_elems = out_num_elems;
+    out->is_view = true;
+    out->n_dim = out_n_dim;
+    out->print = tensor_print;
+    out->shape = new_shape;
+    out->strides = new_strides;
+    out->transpose = tensor_transpose;
+    out->type = self->type;
+    out->unsqueeze = tensor_unsqueeze;
+    out->view = tensor_view;
+    out->slice = tensor_slice;
+
+    return out;
 }
 
 static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err) {
@@ -338,6 +462,7 @@ static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const in
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     tnsr->strides = dynarray_clone(&self->strides, err);
     if (*err != PML_OK) {
         dynarray_free(&tnsr->shape);
@@ -386,6 +511,7 @@ static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
     tnsr->strides = dynarray_clone(&self->strides, err);
     if (*err != PML_OK) {
         dynarray_free(&tnsr->shape);
@@ -1277,7 +1403,7 @@ static void tensor_matmul_2d(
 }
 
 static tensor* tensor_apply_matmul(
-    tensor* left, tensor* right, const container_type_t type, pml_err_t* err
+    const tensor* left, const tensor* right, const container_type_t type, pml_err_t* err
 ) {
     if (left->shape._size < 1 || right->shape._size < 1) {
         *err = PML_INCORRECT_INPUT;
@@ -1675,7 +1801,7 @@ static tensor* tensor_apply_matmul(
     return result;
 }
 
-tensor* tensor_matmul(tensor* left, tensor* right, pml_err_t* err) {
+tensor* tensor_matmul(const tensor* left, const tensor* right, pml_err_t* err) {
     if (left->type != right->type) {
         *err = PML_INCORRECT_INPUT;
         return NULL;

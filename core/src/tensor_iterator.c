@@ -7,7 +7,7 @@
 
 static void* tensor_iterator_get_next(tensor_iterator* self, const dynarray* shape, const dynarray* strides, pml_err_t* err);
 
-tensor_iterator* tensor_iterator_create(tensor* obj, pml_err_t* err) {
+tensor_iterator* tensor_iterator_create(const tensor* obj, pml_err_t* err) {
     tensor_iterator* iterator = (tensor_iterator*)malloc(sizeof(tensor_iterator));
     if (!iterator) {
         *err = PML_OUT_OF_MEMORY;

@@ -14,6 +14,7 @@ typedef struct dynarray {
     result_t (*get_at)(const struct dynarray* self, const size_t idx);
     result_t (*set_at)(struct dynarray* self, const size_t idx, const void* value);
     result_t (*insert_at)(struct dynarray* self, const size_t idx, const void* value);
+    result_t (*delete_at)(struct dynarray* self, const size_t idx);
     pml_err_t (*resize)(struct dynarray* self, const size_t new_size);
 } dynarray;
 
