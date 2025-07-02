@@ -33,6 +33,7 @@ static void linear_module_free(void* self) {
     free(fc->W);
     tensor_free(fc->b);
     free(fc->b);
+    free(fc);
 }
 
 static tensor* linear_module_forward(const void* self, const tensor* input) {

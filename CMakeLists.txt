@@ -12,6 +12,8 @@ add_library(pml
     src/linear.c
     src/functional.c
     src/conv2d.c
+    src/embedding.c
+    src/gpt_modules.c
 )
 
 target_include_directories(pml
