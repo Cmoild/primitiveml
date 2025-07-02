@@ -8,6 +8,7 @@
 
 #define USE_BLAS
 #define USE_PARALLEL_ITERATOR
+
 #ifdef USE_BLAS
 #include <cblas.h>
 #endif
@@ -106,6 +107,66 @@ tensor* tensor_create(
         return NULL;
         break;
     }
+    tnsr->print = tensor_print;
+    tnsr->view = tensor_view;
+    tnsr->transpose = tensor_transpose;
+    tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->slice = tensor_slice;
+    tnsr->contiguous = tensor_contiguous;
+    tnsr->data_num_elems = n_elems;
+    tnsr->strides = strides;
+    tnsr->is_view = false;
+    return tnsr;
+}
+
+tensor* tensor_create_without_copy(
+    void* data,
+    const size_t data_len,
+    const container_type_t type, 
+    const size_t n_dimensions, 
+    const dynarray shape, 
+    pml_err_t* error
+) {
+    if (data_len == 0) {
+        *error = PML_EMPTY_TENSOR;
+        return NULL;
+    }
+
+    tensor* tnsr = (tensor*)malloc(sizeof(tensor));
+    tnsr->type = type;
+    tnsr->shape = shape;
+    tnsr->n_dim = n_dimensions;
+
+    pml_err_t err_strides = PML_OK;
+    dynarray strides = dynarray_create(NULL, 0, TYPE_INT32, &err_strides);
+    if (err_strides != PML_OK) {
+        *error = err_strides;
+        dynarray_free(&strides);
+        free(tnsr);
+        return NULL;
+    }
+    if (n_dimensions != 0) {
+        err_strides = strides.resize(&strides, n_dimensions);
+        if (err_strides != PML_OK) {
+            *error = err_strides;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+    }
+    size_t n_elems = 1;
+    for (int i = n_dimensions - 1; i >= 0; i--) {
+        strides.set_at(&strides, (size_t)i, (int32_t*)&n_elems);
+        result_t res_get = shape.get_at(&shape, (size_t)i);
+        if (res_get.err != PML_OK) {
+            *error = PML_INCORRECT_INPUT;
+            dynarray_free(&strides);
+            free(tnsr);
+            return NULL;
+        }
+        n_elems *= (size_t)res_get.val.i;
+    }
+    tnsr->data = data;
     tnsr->print = tensor_print;
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
@@ -550,8 +611,70 @@ static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t
     return tnsr;
 }
 
+bool tensor_is_contiguous(const tensor* input, pml_err_t* err) {
+    if (input->n_dim == 0) {
+        return true;
+    }
+    int32_t cur_stride = input->strides.get_at(&input->strides, 0).val.i;
+    for (size_t i = 1; i < input->n_dim; i++) {
+        int32_t stride = input->strides.get_at(&input->strides, i).val.i;
+        if (cur_stride < stride) {
+            return false;
+        }
+        cur_stride = stride;
+    }
+    return cur_stride == 1;
+}
+
 static tensor* tensor_contiguous(const tensor* self, pml_err_t* err) {
-    // TODO
+    *err = PML_OK;
+    tensor* result;
+
+    dynarray result_shape = dynarray_clone(&self->shape, err);
+    if (*err != PML_OK) {
+        return NULL;
+    }
+    result = tensor_create_zeros(self->type, self->shape._size, result_shape, err);
+    if (*err != PML_OK) {
+        dynarray_free(&result_shape);
+        return NULL;
+    }
+    tensor_iterator* iterator_input = tensor_iterator_create(self, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        return NULL;
+    }
+    tensor_iterator* iterator_result = tensor_iterator_create(result, err);
+    if (*err != PML_OK) {
+        tensor_free(result);
+        free(result);
+        free(iterator_input);
+        return NULL;
+    }
+    do {
+        void* input_ptr = iterator_input->get_next(iterator_input, &self->shape, &self->strides, err);
+        void* result_ptr = iterator_result->get_next(iterator_result, &result->shape, &result->strides, err);
+        if (input_ptr && result_ptr) {
+            switch (self->type)
+            {
+            case TYPE_FLOAT:
+                *(float*)result_ptr = *(float*)input_ptr;
+                break;
+            case TYPE_INT32:
+                *(int32_t*)result_ptr = *(int32_t*)input_ptr;
+                break;
+            default:
+                break;
+            }
+        }
+    } while (!iterator_input->finished && !iterator_result->finished);
+    tensor_iterator_free(iterator_input);
+    free(iterator_input);
+    tensor_iterator_free(iterator_result);
+    free(iterator_result);
+
+    return result;
 }
 
 static void print_helper(const tensor* self, size_t shape_idx, void* data) {

@@ -33,6 +33,15 @@ tensor* tensor_create(
     pml_err_t* error
 );
 
+tensor* tensor_create_without_copy(
+    void* data,
+    const size_t data_len,
+    const container_type_t type, 
+    const size_t n_dimensions, 
+    const dynarray shape, 
+    pml_err_t* error
+);
+
 tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type, pml_err_t* error);
 
 tensor* tensor_create_zeros(
@@ -45,6 +54,8 @@ tensor* tensor_create_zeros(
 void tensor_free(tensor* obj);
 
 bool tensor_shapes_broadcastable(tensor* left, tensor* right, pml_err_t* err);
+
+bool tensor_is_contiguous(const tensor* input, pml_err_t* err);
 
 tensor* tensor_add(tensor* left, tensor* right, container_type_t type, pml_err_t* err);
 
