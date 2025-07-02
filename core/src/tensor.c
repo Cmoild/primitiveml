@@ -7,6 +7,7 @@
 #include <tensor_index.h>
 
 #define USE_BLAS
+#define USE_PARALLEL_ITERATOR
 #ifdef USE_BLAS
 #include <cblas.h>
 #endif
@@ -20,6 +21,8 @@ static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const in
 static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t* err);
 
 static tensor* tensor_slice(const tensor* self, const index_tuple_t slices, pml_err_t* err);
+
+static tensor* tensor_contiguous(const tensor* self, pml_err_t* err);
 
 tensor* tensor_create(
     const void* data,
@@ -108,6 +111,7 @@ tensor* tensor_create(
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
     tnsr->slice = tensor_slice;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
     tnsr->is_view = false;
@@ -127,6 +131,7 @@ tensor* tensor_create_scalar(const void* value_ptr, const container_type_t type,
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->slice = tensor_slice;
     switch (type) {
     case TYPE_INT32:
@@ -256,6 +261,7 @@ tensor* tensor_create_zeros(
     tnsr->view = tensor_view;
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->slice = tensor_slice;
     tnsr->data_num_elems = n_elems;
     tnsr->strides = strides;
@@ -311,6 +317,7 @@ static tensor* tensor_view(const tensor* self, const dynarray shape, pml_err_t* 
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
     tnsr->slice = tensor_slice;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->strides = strides;
     tnsr->is_view = true;
     return tnsr;
@@ -428,6 +435,7 @@ static tensor* tensor_slice(const tensor* self, const index_tuple_t slices, pml_
     out->unsqueeze = tensor_unsqueeze;
     out->view = tensor_view;
     out->slice = tensor_slice;
+    out->contiguous = tensor_contiguous;
 
     return out;
 }
@@ -466,6 +474,7 @@ static tensor* tensor_transpose(const tensor* self, const int32_t idx1, const in
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
     tnsr->slice = tensor_slice;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->strides = dynarray_clone(&self->strides, err);
     if (*err != PML_OK) {
         dynarray_free(&tnsr->shape);
@@ -515,6 +524,7 @@ static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t
     tnsr->transpose = tensor_transpose;
     tnsr->unsqueeze = tensor_unsqueeze;
     tnsr->slice = tensor_slice;
+    tnsr->contiguous = tensor_contiguous;
     tnsr->strides = dynarray_clone(&self->strides, err);
     if (*err != PML_OK) {
         dynarray_free(&tnsr->shape);
@@ -538,6 +548,10 @@ static tensor* tensor_unsqueeze(const tensor* self, const int32_t idx, pml_err_t
     tnsr->strides.insert_at(&tnsr->strides, (size_t)positive_idx, &new_stride);
 
     return tnsr;
+}
+
+static tensor* tensor_contiguous(const tensor* self, pml_err_t* err) {
+    // TODO
 }
 
 static void print_helper(const tensor* self, size_t shape_idx, void* data) {
@@ -808,6 +822,7 @@ static tensor* tensor_apply_elementwise_operation(
             free(iterator_result);
             return NULL;
         }
+        #ifndef USE_PARALLEL_ITERATOR
         do {
             void* left_ptr = iterator_left->get_next(iterator_left, &out.result_shape, &out.left_strides, err);
             void* right_ptr = iterator_right->get_next(iterator_right, &out.result_shape, &out.right_strides, err);
@@ -822,6 +837,25 @@ static tensor* tensor_apply_elementwise_operation(
                 // printf("left: %d, right: %d, result: %d\n", *(int32_t*)left_ptr, *(int32_t*)right_ptr, *(int32_t*)result_ptr);
             }
         } while (!iterator_left->finished && !iterator_right->finished && !iterator_result->finished);
+        #else
+        bool not_ok = false;
+        #pragma omp parallel for
+        for (size_t i = 0; i < result->data_num_elems; i++) {
+            void* left_ptr = iterator_left->get_by_idx(iterator_left, &out.result_shape, &out.left_strides, i, err);
+            void* right_ptr = iterator_right->get_by_idx(iterator_right, &out.result_shape, &out.right_strides, i, err);
+            void* result_ptr = iterator_result->get_by_idx(iterator_result, &out.result_shape, &result->strides, i, err);
+            if (left_ptr && right_ptr && result_ptr) {
+                operation(result_ptr, left_ptr, right_ptr, type, err);
+                if (*err != PML_OK) {
+                    not_ok = true;
+                }
+            }
+        }
+        if (not_ok) {
+            tensor_free(result);
+            free(result);
+        }
+        #endif
         dynarray_free(&out.left_strides);
         dynarray_free(&out.right_strides);
         tensor_iterator_free(iterator_left);

@@ -21,6 +21,7 @@ typedef struct tensor {
     struct tensor* (*transpose)(const struct tensor* self, const int32_t idx1, const int32_t idx2, pml_err_t* err);
     struct tensor* (*unsqueeze)(const struct tensor* self, const int32_t idx, pml_err_t* err);
     struct tensor* (*slice)(const struct tensor* self, const index_tuple_t slices, pml_err_t* err);
+    struct tensor* (*contiguous)(const struct tensor* self, pml_err_t* err);
 } tensor;
 
 tensor* tensor_create(
@@ -97,6 +98,7 @@ typedef struct tensor_iterator {
     bool finished;
     bool started;
     void* (*get_next)(struct tensor_iterator* self, const dynarray* shape, const dynarray* strides, pml_err_t* err);
+    void* (*get_by_idx)(struct tensor_iterator* self, const dynarray* shape, const dynarray* strides, const size_t idx, pml_err_t* err);
 } tensor_iterator;
 
 tensor_iterator* tensor_iterator_create(const tensor* obj, pml_err_t* err);

@@ -7,6 +7,8 @@
 
 static void* tensor_iterator_get_next(tensor_iterator* self, const dynarray* shape, const dynarray* strides, pml_err_t* err);
 
+static void* tensor_iterator_get_by_idx(tensor_iterator* self, const dynarray* shape, const dynarray* strides, const size_t idx, pml_err_t* err);
+
 tensor_iterator* tensor_iterator_create(const tensor* obj, pml_err_t* err) {
     tensor_iterator* iterator = (tensor_iterator*)malloc(sizeof(tensor_iterator));
     if (!iterator) {
@@ -31,6 +33,7 @@ tensor_iterator* tensor_iterator_create(const tensor* obj, pml_err_t* err) {
     iterator->started = false;
     *err = PML_OK;
     iterator->get_next = tensor_iterator_get_next;
+    iterator->get_by_idx = tensor_iterator_get_by_idx;
     iterator->data_ptr = obj->data;
     return iterator;
 }
@@ -95,5 +98,46 @@ static void* tensor_iterator_get_next(tensor_iterator* self, const dynarray* sha
         }
         offset += dim_stride.val.i * self->element_size * dim_counter.val.i;
     }
+    return (char*)self->data_ptr + offset;
+}
+
+static void* tensor_iterator_get_by_idx(tensor_iterator* self, const dynarray* shape, const dynarray* strides, const size_t idx, pml_err_t* err) {
+    dynarray current_indices = dynarray_zeros(shape->_size, TYPE_INT32, err);
+    int32_t cur_idx = (int32_t)idx;
+    size_t n_elems = 1;
+    for (int64_t i = (int64_t)current_indices._size - 1; i >= 0; i--) {
+        result_t dim_size = shape->get_at(shape, (size_t)i);
+        if (dim_size.err != PML_OK) {
+            *err = dim_size.err;
+            dynarray_free(&current_indices);
+            return NULL;
+        }
+        n_elems *= dim_size.val.i;
+        int32_t new_value = cur_idx % dim_size.val.i;
+        cur_idx /= dim_size.val.i;
+        current_indices.set_at(&current_indices, (size_t)i, &new_value);
+    }
+    if (idx >= n_elems) {
+        *err = PML_OUT_OF_BOUNDS;
+        dynarray_free(&current_indices);
+        return NULL;
+    }
+    size_t offset = 0;
+    for (int64_t i = current_indices._size - 1; i >= 0; i--) {
+        result_t dim_counter = current_indices.get_at(&current_indices, (size_t)i);
+        if (dim_counter.err != PML_OK) {
+            *err = dim_counter.err;
+            dynarray_free(&current_indices);
+            return NULL;
+        }
+        result_t dim_stride = strides->get_at(strides, (size_t)i);
+        if (dim_stride.err != PML_OK) {
+            *err = dim_stride.err;
+            dynarray_free(&current_indices);
+            return NULL;
+        }
+        offset += dim_stride.val.i * self->element_size * dim_counter.val.i;
+    }
+    dynarray_free(&current_indices);
     return (char*)self->data_ptr + offset;
 }
