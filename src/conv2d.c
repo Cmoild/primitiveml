@@ -11,7 +11,7 @@ static void conv2d_module_print(const void* self);
 
 static tensor* conv2d_module_forward(const void* self, const tensor* input);
 
-conv2d_module* conv2d_module_create(tensor* weight, tensor* bias, size_t padding, pml_err_t* err) {
+conv2d_module* conv2d_module_create(tensor* weight, tensor* bias, size_t padding, size_t stride, pml_err_t* err) {
     if (weight->n_dim != 4 && bias->n_dim != 1) {
         *err = PML_INCORRECT_INPUT;
         return NULL;
@@ -40,6 +40,7 @@ conv2d_module* conv2d_module_create(tensor* weight, tensor* bias, size_t padding
     module->weight = weight;
     module->bias = bias;
     module->padding = padding;
+    module->stride = stride;
     return module;
 }
 
@@ -60,7 +61,8 @@ static void convolve_2d_float_tensor(
         *err = PML_INCORRECT_INPUT;
         return;
     }
-    // use iterator here
+    
+    // NOT IMPLEMENTED
 
 }
 

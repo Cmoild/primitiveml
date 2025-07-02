@@ -9,8 +9,9 @@ typedef struct conv2d_module {
     tensor* weight;
     tensor* bias;
     size_t padding;
+    size_t stride;
 } conv2d_module;
 
-conv2d_module* conv2d_module_create(tensor* weight, tensor* bias, size_t padding, pml_err_t* err);
+conv2d_module* conv2d_module_create(tensor* weight, tensor* bias, size_t padding, size_t stride, pml_err_t* err);
 
 #endif // CONV2D_MODULE_H

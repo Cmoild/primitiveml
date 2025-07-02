@@ -6,6 +6,10 @@
 #include <math.h>
 #include <tensor_index.h>
 
+#define USE_BLAS
+#ifdef USE_BLAS
+#include <cblas.h>
+#endif
 
 static void tensor_print(const tensor* self);
 
@@ -1374,6 +1378,20 @@ static void tensor_matmul_2d(
     int32_t shape_row_right, int32_t shape_col_right,
     container_type_t type, pml_err_t* err
 ) {
+    #ifdef USE_BLAS
+    if (type == TYPE_FLOAT) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            shape_row_result, shape_col_result, shape_col_left,
+            1.0f,
+            (const float*)left_ptr, stride_row_left,
+            (const float*)right_ptr, stride_row_right,
+            0.0f,
+            (float*)result_ptr, stride_row_result);
+        *err = PML_OK;
+        return;
+    }
+    #endif
+
     size_t element_size = 0;
     switch (type)
     {
@@ -1388,7 +1406,9 @@ static void tensor_matmul_2d(
         return;
         break;
     }
+    #pragma omp parallel for
     for (size_t i = 0; i < (size_t)shape_row_left; i++) {
+        #pragma omp parallel for
         for (size_t j = 0; j < (size_t)shape_col_right; j++) {
             tensor_matmul_2d_sum_helper(
                 (char*)result_ptr + i * element_size * stride_row_result + j * element_size * stride_col_result,

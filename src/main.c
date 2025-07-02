@@ -11,18 +11,14 @@
 int main(){
     pml_err_t err = PML_OK;
 
-    dynarray shape = dynarray_create((int32_t[]){2,2,3}, 3, TYPE_INT32, &err);
-    tensor* t = tensor_create((int32_t[]){1,2,3,4,5,6,7,8,9,10,11,12}, 12, TYPE_INT32, 3, shape, &err);
-    index_tuple_t tup = {
-        .len = 3,
-        .items = (tensor_index_t[]) {
-            { .type = IDX_INT, .value = { .index = 0 } },
-            { .type = IDX_SLICE, .value = { .slice = { .start = 0, .end = 2 } } },
-            { .type = IDX_SLICE, .value = { .slice = { .start = 0, .end = 1 } } },
-        },
-    };
-    tensor* sl = t->slice(t, tup, &err);
-    sl->print(sl);
+    dynarray shape1 = dynarray_create((int32_t[]){100, 1000,9500}, 3, TYPE_INT32, &err);
+    tensor* t1 = tensor_create_zeros(TYPE_FLOAT, 3, shape1, &err);
 
+    dynarray shape2 = dynarray_create((int32_t[]){9500,9500}, 2, TYPE_INT32, &err);
+    tensor* t2 = tensor_create_zeros(TYPE_FLOAT, 2, shape2, &err);
+
+    tensor* t3 = tensor_matmul(t1, t2, &err);
+    t3->shape.print(&t3->shape);
+    
     return 0;
 }
