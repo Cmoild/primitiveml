@@ -38,6 +38,7 @@ static void layernorm_free(void* self) {
     free(module->eps);
     tensor_free(module->weight);
     free(module->weight);
+    free(module);
 }
 
 static void layernorm_print(const void* self) {

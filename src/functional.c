@@ -24,7 +24,7 @@ tensor* sigmoid(const tensor* input, pml_err_t* err) {
 }
 
 float scalar_gelu(float x) {
-    return 0.5F * x * (1.0F + tanhf(sqrtf(2.0F / 3.14159F) * (x + 0.044715F * x * x * x)));
+    return 0.5F * x * (1.0F + tanhf(sqrtf(2.0F / 3.141592653589793F) * (x + 0.044715F * x * x * x)));
 }
 
 tensor* gelu(const tensor* input, pml_err_t* err) {

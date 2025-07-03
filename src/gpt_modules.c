@@ -49,6 +49,7 @@ static void causal_self_attention_free(void* self) {
     free(module->causal_mask);
     module->output_proj->module_base.destroy(module->output_proj);
     module->qkv_proj->module_base.destroy(module->qkv_proj);
+    free(module);
 }
 
 static tensor* causal_self_attention_forward(const void* self, const tensor* input) {
@@ -184,4 +185,108 @@ static tensor* causal_self_attention_forward(const void* self, const tensor* inp
 
 static void causal_self_attention_print(const void* self) {
     printf("Causal Self Attention\n");
+}
+
+static void feed_forward_free(void* self);
+
+static void feed_forward_print(const void* self);
+
+static tensor* feed_forward_forward(const void* self, const tensor* input);
+
+feed_forward* feed_forward_create(linear_module* fc, linear_module* fc_proj, pml_err_t* err) {
+    int32_t inp_sz = fc->weight->shape.get_at(&fc->weight->shape, 1).val.i;
+    int32_t hidden_sz = fc->weight->shape.get_at(&fc->weight->shape, 0).val.i;
+    int32_t hidden_proj_sz = fc_proj->weight->shape.get_at(&fc_proj->weight->shape, 1).val.i;
+    int32_t out_sz = fc_proj->weight->shape.get_at(&fc_proj->weight->shape, 0).val.i;
+    if (!(inp_sz == out_sz && hidden_proj_sz == hidden_sz)) {
+        *err = PML_INCORRECT_INPUT;
+        return NULL;
+    }
+    feed_forward* module = (feed_forward*)malloc(sizeof(feed_forward));
+    module->module_base = (module_iface){
+        .destroy = feed_forward_free,
+        .forward = feed_forward_forward,
+        .print = feed_forward_print,
+    };
+    module->fc = fc;
+    module->fc_proj = fc_proj;
+    return module;
+}
+
+static void feed_forward_free(void* self) {
+    feed_forward* module = (feed_forward*)self;
+    module->fc->module_base.destroy(module->fc);
+    module->fc_proj->module_base.destroy(module->fc_proj);
+    free(module);
+}
+
+static void feed_forward_print(const void* self) {
+    printf("Feed Forward Layer\n");
+}
+
+static tensor* feed_forward_forward(const void* self, const tensor* input) {
+    feed_forward* module = (feed_forward*)self;
+    pml_err_t err;
+    
+    tensor* fc_out = module->fc->module_base.forward(module->fc, input);
+
+    tensor* gelu_out = gelu(fc_out, &err);
+    tensor_free(fc_out); free(fc_out);
+
+    tensor* out = module->fc_proj->module_base.forward(module->fc_proj, gelu_out);
+    tensor_free(gelu_out); free(gelu_out);
+
+    return out;
+}
+
+static void gpt_block_free(void* self);
+
+static void gpt_block_print(const void* self);
+
+static tensor* gpt_block_forward(const void* self, const tensor* input);
+
+gpt_block* gpt_block_create(layernorm* ln_1, layernorm* ln_2, causal_self_attention* attn, feed_forward* ffn) {
+    gpt_block* module = (gpt_block*)malloc(sizeof(gpt_block));
+    module->module_base = (module_iface){
+        .destroy = gpt_block_free,
+        .forward = gpt_block_forward,
+        .print = gpt_block_print,
+    };
+    module->ln_1 = ln_1;
+    module->ln_2 = ln_2;
+    module->attn = attn;
+    module->ffn = ffn;
+    return module;
+}
+
+static void gpt_block_free(void* self) {
+    gpt_block* module = (gpt_block*)self;
+    module->ln_1->module_base.destroy(module->ln_1);
+    module->ln_2->module_base.destroy(module->ln_2);
+    module->attn->module_base.destroy(module->attn);
+    module->ffn->module_base.destroy(module->ffn);
+    free(module);
+}
+
+static void gpt_block_print(const void* self) {
+    printf("GPT Block\n");
+}
+
+static tensor* gpt_block_forward(const void* self, const tensor* input) {
+    gpt_block* module = (gpt_block*)self;
+    pml_err_t err;
+
+    tensor* ln_1_out = module->ln_1->module_base.forward(module->ln_1, input);
+    tensor* attn_out = module->attn->module_base.forward(module->attn, ln_1_out);
+    tensor* inp_skip = tensor_add(input, attn_out, input->type, &err);
+    tensor_free(ln_1_out); free(ln_1_out);
+    tensor_free(attn_out); free(attn_out);
+
+    tensor* ln_2_out = module->ln_2->module_base.forward(module->ln_2, inp_skip);
+    tensor* ffn_out = module->ffn->module_base.forward(module->ffn, ln_2_out);
+    tensor* out = tensor_add(inp_skip, ffn_out, inp_skip->type, &err);
+    tensor_free(ln_2_out); free(ln_2_out);
+    tensor_free(ffn_out); free(ffn_out);
+
+    return out;
 }
