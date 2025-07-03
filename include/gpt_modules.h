@@ -5,15 +5,18 @@
 #include <linear.h>
 #include <error_handling.h>
 
-typedef struct mha_module {
-    linear_module* fc_kqv;
-    linear_module* fc_out;
-    tensor* attention_mask;
-} mha_module;
+typedef struct causal_self_attention {
+    module_iface module_base;
+    linear_module* qkv_proj;
+    linear_module* output_proj;
+    tensor* causal_mask;
+    size_t embedding_dim;
+    size_t num_heads;
+} causal_self_attention;
 
-mha_module* mha_module_create(
-    linear_module* fc_kqv, linear_module* fc_out, 
-    size_t context_window_size, size_t n_head, pml_err_t* err
+causal_self_attention* causal_self_attention_create(
+    linear_module* qkv_proj, linear_module* output_proj, tensor* causal_mask,
+    size_t num_heads, size_t embedding_dim, pml_err_t* err
 );
 
 #endif // GPT_MODULES_H

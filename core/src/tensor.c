@@ -6,8 +6,8 @@
 #include <math.h>
 #include <tensor_index.h>
 
-#define USE_BLAS
-#define USE_PARALLEL_ITERATOR
+// #define USE_BLAS
+// #define USE_PARALLEL_ITERATOR
 
 #ifdef USE_BLAS
 #include <cblas.h>
