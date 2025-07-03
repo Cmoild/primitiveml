@@ -9,6 +9,7 @@
 #include <embedding.h>
 #include <math.h>
 #include <gpt_modules.h>
+#include <layernorm.h>
 
 
 int main(){
@@ -70,7 +71,15 @@ int main(){
         32, TYPE_FLOAT, 3, dynarray_create((int[]){2, 4, 4}, 3, TYPE_INT32, &err), &err
     );
 
-    tensor* out = mha->module_base.forward(mha, inp);
+    tensor* ln_weight = tensor_create(
+        (float[]){1,1,1,1}, 4, TYPE_FLOAT, 1, dynarray_create((int[]){4}, 1, TYPE_INT32, &err), &err
+    );
+    tensor* ln_bias = tensor_create(
+        (float[]){0,0,0,0}, 4, TYPE_FLOAT, 1, dynarray_create((int[]){4}, 1, TYPE_INT32, &err), &err
+    );
+    layernorm* ln = layernorm_create(ln_weight, ln_bias, 1e-5, &err);
+
+    tensor* out = ln->module_base.forward(ln, inp);
 
     out->print(out);
     

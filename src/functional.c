@@ -15,11 +15,20 @@ tensor* relu(const tensor* input, pml_err_t* err) {
 }
 
 float scalar_sigmoid(float x) {
-    return 1.f / (1.f + expf(-x));
+    return 1.0F / (1.0F + expf(-x));
 }
 
 tensor* sigmoid(const tensor* input, pml_err_t* err) {
     tensor* result = tensor_float_custom_elementwise_unary_operation(input, err, scalar_sigmoid);
+    return result;
+}
+
+float scalar_gelu(float x) {
+    return 0.5F * x * (1.0F + tanhf(sqrtf(2.0F / 3.14159F) * (x + 0.044715F * x * x * x)));
+}
+
+tensor* gelu(const tensor* input, pml_err_t* err) {
+    tensor* result = tensor_float_custom_elementwise_unary_operation(input, err, scalar_gelu);
     return result;
 }
 

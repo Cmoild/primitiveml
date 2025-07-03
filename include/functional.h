@@ -10,4 +10,6 @@ tensor* sigmoid(const tensor* input, pml_err_t* err);
 
 tensor* softmax(const tensor* input, int32_t dim, pml_err_t* err);
 
+tensor* gelu(const tensor* input, pml_err_t* err);
+
 #endif // FUNCTIONAL_HEADER_FILE

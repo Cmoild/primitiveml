@@ -14,6 +14,7 @@ add_library(pml
     src/conv2d.c
     src/embedding.c
     src/gpt_modules.c
+    src/layernorm.c
 )
 
 target_include_directories(pml
