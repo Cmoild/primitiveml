@@ -290,3 +290,89 @@ static tensor* gpt_block_forward(const void* self, const tensor* input) {
 
     return out;
 }
+
+static void gpt_model_free(void* self);
+
+static void gpt_model_print(const void* self);
+
+static tensor* gpt_model_forward(const void* self, const tensor* input);
+
+gpt_model* gpt_model_create(
+    embedding_module* wte, embedding_module* wpe,
+    gpt_block** blocks, size_t num_blocks,
+    layernorm* ln, linear_module* fc
+) {
+    gpt_model* module = (gpt_model*)malloc(sizeof(gpt_model));
+    module->module_base = (module_iface){
+        .destroy = gpt_model_free,
+        .forward = gpt_model_forward,
+        .print = gpt_model_print,
+    };
+    module->blocks = blocks;
+    module->fc = fc;
+    module->ln = ln;
+    module->num_blocks = num_blocks;
+    module->wpe = wpe;
+    module->wte = wte;
+    return module;
+}
+
+static void gpt_model_free(void* self) {
+    gpt_model* module = (gpt_model*)self;
+    for (size_t i = 0; i < module->num_blocks; i++) {
+        gpt_block* block = module->blocks[i];
+        block->module_base.destroy(block);
+    }
+    module->fc->module_base.destroy(module->fc);
+    module->ln->module_base.destroy(module->ln);
+    module->wpe->module_base.destroy(module->wpe);
+    module->wte->module_base.destroy(module->wte);
+    free(module);
+}
+
+static void gpt_model_print(const void* self) {
+    printf("GPT\n");
+}
+
+static tensor* gpt_model_forward(const void* self, const tensor* input) {
+    gpt_model* module = (gpt_model*)self;
+    pml_err_t err;
+
+    if (input->n_dim != 2) {
+        return NULL;
+    }
+
+    int32_t seq_len = input->shape.get_at(&input->shape, 1).val.i;
+    int32_t* range = (int32_t*)malloc(sizeof(int32_t) * seq_len);
+    for (int i = 0; i < seq_len; i++) {
+        range[i] = i;
+    }
+    tensor* pos = tensor_create(
+        range, seq_len, TYPE_INT32, 2,
+        dynarray_create((int[]){1, seq_len}, 2, TYPE_INT32, &err), &err
+    );
+    free(range);
+
+    tensor* wte_out = module->wte->module_base.forward(module->wte, input);
+    tensor* wpe_out = module->wpe->module_base.forward(module->wpe, pos);
+
+    tensor* x = tensor_add(wte_out, wpe_out, wte_out->type, &err);
+    tensor_free(wte_out); free(wte_out);
+    tensor_free(pos); free(pos);
+    tensor_free(wpe_out); free(wpe_out);
+
+    for (size_t i = 0; i < module->num_blocks; i++) {
+        gpt_block* block = module->blocks[i];
+        tensor* block_out = block->module_base.forward(block, x);
+        tensor_free(x); free(x);
+        x = block_out;
+    }
+
+    tensor* ln_out = module->ln->module_base.forward(module->ln, x);
+    tensor_free(x); free(x);
+
+    tensor* logits = module->fc->module_base.forward(module->fc, ln_out);
+    tensor_free(ln_out); free(ln_out);
+
+    return logits;
+}
