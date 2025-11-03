@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <errno.h>
+#include <string.h>
 #include <dynarray.h>
 #include <tensor.h>
 #include <stdlib.h>
@@ -7,12 +9,10 @@
 #include <functional.h>
 #include <tensor_index.h>
 #include <embedding.h>
-#include <math.h>
 #include <gpt_modules.h>
 #include <layernorm.h>
 
-
-#define MODEL_DIR "/home/me/code/ml_env/nanogpt/model/"
+#define MODEL_DIR "../nanogpt/model/"
 
 typedef struct {
     float* qkv_proj_weight;
@@ -56,7 +56,8 @@ typedef struct {
 } gpt_block_float;
 
 void free_block(gpt_block_float* block) {
-    if (!block) return;
+    if (!block)
+        return;
 
     free(block->qkv_proj_weight);
     free(block->qkv_proj_bias);
@@ -182,70 +183,65 @@ static gpt_block* load_block(size_t idx, size_t cont_wind_sz, size_t embed_dim, 
     pml_err_t err;
 
     tensor* mask = tensor_create(
-        block->mask,
-        block->mask_size, TYPE_FLOAT, 4,
-        dynarray_create((int32_t[]){1, 1, (int32_t)cont_wind_sz, (int32_t)cont_wind_sz}, 4, TYPE_INT32, &err), &err
-    );
+        block->mask, block->mask_size, TYPE_FLOAT, 4,
+        dynarray_create((int32_t[]){1, 1, (int32_t)cont_wind_sz, (int32_t)cont_wind_sz}, 4,
+                        TYPE_INT32, &err),
+        &err);
 
-    tensor* qkv_proj_weight = tensor_create(
-        block->qkv_proj_weight, block->qkv_proj_weight_size, TYPE_FLOAT, 2,
-        dynarray_create((int[]){block->qkv_proj_weight_size / embed_dim, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
+    tensor* qkv_proj_weight =
+        tensor_create(block->qkv_proj_weight, block->qkv_proj_weight_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){block->qkv_proj_weight_size / embed_dim, embed_dim},
+                                      2, TYPE_INT32, &err),
+                      &err);
     tensor* qkv_proj_bias = tensor_create(
-        block->qkv_proj_bias, block->qkv_proj_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){block->qkv_proj_bias_size}, 1, TYPE_INT32, &err), &err
-    );
+        block->qkv_proj_bias, block->qkv_proj_bias_size, TYPE_FLOAT, 1,
+        dynarray_create((int[]){block->qkv_proj_bias_size}, 1, TYPE_INT32, &err), &err);
     linear_module* qkv_proj = linear_module_create(qkv_proj_weight, qkv_proj_bias, &err);
 
-    tensor* out_proj_weight = tensor_create(
-        block->out_proj_weight, block->out_proj_weight_size, TYPE_FLOAT, 2, 
-        dynarray_create((int[]){embed_dim, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
-    tensor* out_proj_bias = tensor_create(
-        block->out_proj_bias, block->out_proj_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
+    tensor* out_proj_weight =
+        tensor_create(block->out_proj_weight, block->out_proj_weight_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){embed_dim, embed_dim}, 2, TYPE_INT32, &err), &err);
+    tensor* out_proj_bias =
+        tensor_create(block->out_proj_bias, block->out_proj_bias_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
     linear_module* out_proj = linear_module_create(out_proj_weight, out_proj_bias, &err);
 
-    causal_self_attention* mha = causal_self_attention_create(qkv_proj, out_proj, mask, n_heads, embed_dim, &err);
+    causal_self_attention* mha =
+        causal_self_attention_create(qkv_proj, out_proj, mask, n_heads, embed_dim, &err);
 
-    tensor* ln1_weight = tensor_create(
-        block->ln1_weight, block->ln1_weight_size, TYPE_FLOAT, 1,
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
-    tensor* ln1_bias = tensor_create(
-        block->ln1_bias, block->ln1_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
-    tensor* ln2_weight = tensor_create(
-        block->ln2_weight, block->ln2_weight_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
-    tensor* ln2_bias = tensor_create(
-        block->ln2_bias, block->ln2_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
+    tensor* ln1_weight =
+        tensor_create(block->ln1_weight, block->ln1_weight_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
+    tensor* ln1_bias =
+        tensor_create(block->ln1_bias, block->ln1_bias_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
+    tensor* ln2_weight =
+        tensor_create(block->ln2_weight, block->ln2_weight_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
+    tensor* ln2_bias =
+        tensor_create(block->ln2_bias, block->ln2_bias_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
     layernorm* ln1 = layernorm_create(ln1_weight, ln1_bias, 1e-5, &err);
     layernorm* ln2 = layernorm_create(ln2_weight, ln2_bias, 1e-5, &err);
 
-    tensor* ffn_in_weight = tensor_create(
-        block->ffn_in_weight, block->ffn_in_weight_size, TYPE_FLOAT, 2,
-        dynarray_create((int[]){block->ffn_in_weight_size / embed_dim, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
-    tensor* ffn_in_bias = tensor_create(
-        block->ffn_in_bias, block->ffn_in_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){block->ffn_in_bias_size}, 1, TYPE_INT32, &err), &err
-    );
+    tensor* ffn_in_weight =
+        tensor_create(block->ffn_in_weight, block->ffn_in_weight_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){block->ffn_in_weight_size / embed_dim, embed_dim}, 2,
+                                      TYPE_INT32, &err),
+                      &err);
+    tensor* ffn_in_bias =
+        tensor_create(block->ffn_in_bias, block->ffn_in_bias_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){block->ffn_in_bias_size}, 1, TYPE_INT32, &err), &err);
     linear_module* ffn_in = linear_module_create(ffn_in_weight, ffn_in_bias, &err);
 
-    tensor* ffn_out_weight = tensor_create(
-        block->ffn_out_weight, block->ffn_out_weight_size, TYPE_FLOAT, 2, 
-        dynarray_create((int[]){embed_dim, block->ffn_out_weight_size / embed_dim}, 2, TYPE_INT32, &err), &err
-    );
+    tensor* ffn_out_weight =
+        tensor_create(block->ffn_out_weight, block->ffn_out_weight_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){embed_dim, block->ffn_out_weight_size / embed_dim}, 2,
+                                      TYPE_INT32, &err),
+                      &err);
     tensor* ffn_out_bias = tensor_create(
-        block->ffn_out_bias, block->ffn_out_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){block->ffn_out_bias_size}, 1, TYPE_INT32, &err), &err
-    );
+        block->ffn_out_bias, block->ffn_out_bias_size, TYPE_FLOAT, 1,
+        dynarray_create((int[]){block->ffn_out_bias_size}, 1, TYPE_INT32, &err), &err);
     linear_module* ffn_out = linear_module_create(ffn_out_weight, ffn_out_bias, &err);
 
     feed_forward* ffn = feed_forward_create(ffn_in, ffn_out, &err);
@@ -278,7 +274,8 @@ typedef struct {
 } gpt_model_float;
 
 void free_model_weights(gpt_model_float* model) {
-    if (!model) return;
+    if (!model)
+        return;
 
     free(model->wte);
     free(model->wpe);
@@ -290,7 +287,8 @@ void free_model_weights(gpt_model_float* model) {
     free(model);
 }
 
-static gpt_model* load_model(size_t num_blocks, size_t cont_wind_sz, size_t embed_dim, size_t n_heads, size_t vocab_sz) {
+static gpt_model* load_model(size_t num_blocks, size_t cont_wind_sz, size_t embed_dim,
+                             size_t n_heads, size_t vocab_sz) {
     gpt_model_float* model = (gpt_model_float*)malloc(sizeof(gpt_model_float));
     if (!model) {
         fprintf(stderr, "Error: could not allocate model\n");
@@ -319,36 +317,29 @@ static gpt_model* load_model(size_t num_blocks, size_t cont_wind_sz, size_t embe
 
     pml_err_t err;
 
-    tensor* wte_weight = tensor_create(
-        model->wte, model->wte_size, TYPE_FLOAT, 2,
-        dynarray_create((int[]){vocab_sz, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
+    tensor* wte_weight =
+        tensor_create(model->wte, model->wte_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){vocab_sz, embed_dim}, 2, TYPE_INT32, &err), &err);
     embedding_module* wte = embedding_module_create(wte_weight, &err);
 
-    tensor* wpe_weight = tensor_create(
-        model->wpe, model->wpe_size, TYPE_FLOAT, 2,
-        dynarray_create((int[]){cont_wind_sz, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
+    tensor* wpe_weight =
+        tensor_create(model->wpe, model->wpe_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){cont_wind_sz, embed_dim}, 2, TYPE_INT32, &err), &err);
     embedding_module* wpe = embedding_module_create(wpe_weight, &err);
 
-    tensor* ln_weight = tensor_create(
-        model->ln_weight, model->ln_weight_size, TYPE_FLOAT, 1,
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
-    tensor* ln_bias = tensor_create(
-        model->ln_bias, model->ln_bias_size, TYPE_FLOAT, 1, 
-        dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err
-    );
+    tensor* ln_weight =
+        tensor_create(model->ln_weight, model->ln_weight_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
+    tensor* ln_bias = tensor_create(model->ln_bias, model->ln_bias_size, TYPE_FLOAT, 1,
+                                    dynarray_create((int[]){embed_dim}, 1, TYPE_INT32, &err), &err);
     layernorm* ln = layernorm_create(ln_weight, ln_bias, 1e-5, &err);
 
-    tensor* fc_weight = tensor_create(
-        model->fc_weight, model->fc_weight_size, TYPE_FLOAT, 2,
-        dynarray_create((int[]){vocab_sz, embed_dim}, 2, TYPE_INT32, &err), &err
-    );
-    tensor* fc_bias = tensor_create(
-        model->fc_bias, model->fc_bias_size, TYPE_FLOAT, 1,
-        dynarray_create((int[]){model->fc_bias_size}, 1, TYPE_INT32, &err), &err
-    );
+    tensor* fc_weight =
+        tensor_create(model->fc_weight, model->fc_weight_size, TYPE_FLOAT, 2,
+                      dynarray_create((int[]){vocab_sz, embed_dim}, 2, TYPE_INT32, &err), &err);
+    tensor* fc_bias =
+        tensor_create(model->fc_bias, model->fc_bias_size, TYPE_FLOAT, 1,
+                      dynarray_create((int[]){model->fc_bias_size}, 1, TYPE_INT32, &err), &err);
     linear_module* fc = linear_module_create(fc_weight, fc_bias, &err);
 
     gpt_block** blocks = (gpt_block**)malloc(sizeof(gpt_block*) * num_blocks);
@@ -358,9 +349,7 @@ static gpt_model* load_model(size_t num_blocks, size_t cont_wind_sz, size_t embe
         blocks[i] = block;
     }
 
-    gpt_model* model_out = gpt_model_create(
-        wte, wpe, blocks, num_blocks, ln, fc
-    );
+    gpt_model* model_out = gpt_model_create(wte, wpe, blocks, num_blocks, ln, fc);
 
     free_model_weights(model);
 
@@ -371,10 +360,11 @@ int argmax(tensor* probs) {
     pml_err_t err;
     index_tuple_t tup = {
         .len = 2,
-        .items = (tensor_index_t[]) {
-            { .type = IDX_INT, .value = { .index = 0 } },
-            { .type = IDX_INT, .value = { .index = -1 } },
-        },
+        .items =
+            (tensor_index_t[]){
+                {.type = IDX_INT, .value = {.index = 0}},
+                {.type = IDX_INT, .value = {.index = -1}},
+            },
     };
     tensor* probs_last = probs->slice(probs, tup, &err);
     float* data = probs_last->data;
@@ -386,39 +376,99 @@ int argmax(tensor* probs) {
             max_idx = i;
         }
     }
-    tensor_free(probs_last); free(probs_last);
+    tensor_free(probs_last);
+    free(probs_last);
     return max_idx;
 }
 
 void load_prompt(int* buf, const char* prompt, const size_t len) {
     for (size_t i = 0; i < len; i++) {
-        buf[i] = (int)prompt[i];
+        buf[i] = prompt[i];
     }
 }
 
-int main(){
+void print_usage(const char* progname) {
+    printf("Usage: %s [PROMPT] [NUM_OF_TOKENS_TO_GENERATE]\n", progname);
+    printf("\n");
+    printf("Arguments:\n");
+    printf("  PROMPT                       Text prompt (required).\n");
+    printf("  NUM_OF_TOKENS_TO_GENERATE    Positive integer (required).\n");
+    printf("\n");
+    printf("Options:\n");
+    printf("  -h, --help                   Show this help message and exit.\n");
+}
+
+long parse_positive_long(const char* s, int* ok) {
+    errno = 0;
+    char* endptr = NULL;
+    long val = strtol(s, &endptr, 10);
+    if (errno != 0 || endptr == s || *endptr != '\0') {
+        *ok = 0;
+        return -1;
+    }
+    if (val <= 0) {
+        *ok = 0;
+        return -1;
+    }
+    *ok = 1;
+    return val;
+}
+
+int main(int argc, char* argv[]) {
+    const char* progname = argv[0];
+
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(progname);
+            return 0;
+        }
+    }
+
+    if (argc < 3) {
+        fprintf(stderr, "Error: PROMPT and NUM_OF_TOKENS_TO_GENERATE are required.\n\n");
+        print_usage(progname);
+        return 1;
+    }
+
+    const char* prompt = argv[1];
+    long num_tokens;
+
+    if (argc >= 3) {
+        int ok;
+        num_tokens = parse_positive_long(argv[2], &ok);
+        if (!ok) {
+            fprintf(stderr,
+                    "Error: NUM_OF_TOKENS_TO_GENERATE must be a positive integer (got '%s').\n",
+                    argv[2]);
+            return 2;
+        }
+    }
+
     pml_err_t err = PML_OK;
 
-    gpt_model* model = load_model(4, 256, 256, 4, 256);
-    
-    int buf[128] = {0};
-    char* prompt = "It was";
-    printf("%s", prompt);
-    load_prompt(buf, prompt, 6);
+    gpt_model* model = load_model(2, 256, 128, 4, 256);
 
-    for (int i = 6; i < 50; i++) {
-        tensor* inp = tensor_create(
-            buf, i, TYPE_INT32, 2,
-            dynarray_create((int[]){1, i}, 2, TYPE_INT32, &err), &err
-        );
+    int buf[256] = {0};
+    load_prompt(buf, prompt, strlen(prompt));
+
+    printf("%s", prompt);
+    fflush(stdout);
+
+    for (int i = strlen(prompt); i < num_tokens - strlen(prompt); i++) {
+        tensor* inp = tensor_create(buf, i, TYPE_INT32, 2,
+                                    dynarray_create((int[]){1, i}, 2, TYPE_INT32, &err), &err);
         tensor* out = model->module_base.forward(model, inp);
         tensor* probs = softmax(out, -1, &err);
         buf[i] = argmax(probs);
         printf("%c", buf[i]);
+        fflush(stdout);
 
-        tensor_free(inp); free(inp);
-        tensor_free(out); free(out);
-        tensor_free(probs); free(probs);
+        tensor_free(inp);
+        free(inp);
+        tensor_free(out);
+        free(out);
+        tensor_free(probs);
+        free(probs);
     }
     model->module_base.destroy(model);
     printf("\n");
