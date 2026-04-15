@@ -1,24 +1,42 @@
-add_executable(test_dynarray test_dynarray.c)
-target_link_libraries(test_dynarray PRIVATE pml_core)
+cmake_minimum_required(VERSION 3.14)
 
-add_executable(test_tensor test_tensor.c)
-target_link_libraries(test_tensor PRIVATE pml_core)
+include(FetchContent)
 
-add_executable(test_broadcastable test_broadcastable.c)
-target_link_libraries(test_broadcastable PRIVATE pml_core)
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.14.0
+)
 
-add_executable(test_tensor_iterator test_tensor_iterator.c)
-target_link_libraries(test_tensor_iterator PRIVATE pml_core)
+FetchContent_MakeAvailable(Catch2)
 
-add_executable(test_matmul test_matmul.c)
-target_link_libraries(test_matmul PRIVATE pml_core)
+add_executable(test_broadcastable test_broadcastable.cpp)
 
-add_executable(test_tensor_index test_tensor_index.c)
-target_link_libraries(test_tensor_index PRIVATE pml_core)
+target_link_libraries(test_broadcastable
+    PRIVATE
+        pml_core
+        Catch2::Catch2WithMain
+)
 
-add_test(NAME DynArrayTest COMMAND test_dynarray)
-add_test(NAME TensorTest COMMAND test_tensor)
-add_test(NAME TensorBroadcastableTest COMMAND test_broadcastable)
-add_test(NAME TensorIteratorTest COMMAND test_tensor_iterator)
-add_test(NAME MatMulTest COMMAND test_matmul)
-add_test(NAME TensorIndexTest COMMAND test_tensor_index)
+add_executable(test_broadcasted_strides test_broadcasted_strides.cpp)
+
+target_link_libraries(test_broadcasted_strides
+    PRIVATE
+        pml_core
+        Catch2::Catch2WithMain
+)
+
+include(CTest)
+include(Catch)
+
+catch_discover_tests(test_broadcastable)
+catch_discover_tests(test_broadcasted_strides)
+
+if(BUILD_NUMPY_TESTS)
+    add_library(pmltest SHARED numpy_c_api.cpp)
+
+    target_link_libraries(pmltest
+        PRIVATE
+            pml_core
+    )
+endif()

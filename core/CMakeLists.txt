@@ -1,21 +1,28 @@
-project(pml_core LANGUAGES C)
+project(pml_core LANGUAGES C CXX)
 
 set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 
 find_package(OpenMP REQUIRED)
 
-add_library(pml_core 
-    src/dynarray.c 
+add_library(pml_core
+    src/dynarray.c
     src/tensor.c
     src/tensor_iterator.c
+    src/tensor.cpp
 )
 
-target_include_directories(pml_core 
+target_include_directories(pml_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${BLAS_INCLUDE_DIRS}
 )
 
-target_link_libraries(pml_core 
+target_link_libraries(pml_core
     PRIVATE m
     PRIVATE OpenMP::OpenMP_C
 )
+
+if(BUILD_NUMPY_TESTS)
+    set_target_properties(pml_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
