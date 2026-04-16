@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+#include <numeric>
 #include <vector>
 #include <cstddef>
 #include <memory>
@@ -27,9 +29,6 @@ template <typename T> class Tensor {
     // Constructor with data copy
     Tensor(const T* input_data, std::size_t data_len, const std::vector<std::size_t>& shape)
         : n_dim(shape.size()), shape(shape), is_view(false) {
-        if (data_len == 0 || shape.empty()) {
-            throw std::invalid_argument("Invalid tensor dimensions or data length.");
-        }
 
         // Calculate strides and allocate memory
         calculate_strides();
@@ -38,12 +37,16 @@ template <typename T> class Tensor {
         std::copy(input_data, input_data + data_num_elems, data.get());
     }
 
+    // Constructor with scalar value
+    Tensor(const T scalar_value)
+        : n_dim(0), shape({}), is_view(false), data_num_elems(1), strides({}) {
+        data = std::make_unique<T[]>(data_num_elems);
+        data[0] = scalar_value;
+    }
+
     // Constructor with empty data
     Tensor(const std::vector<std::size_t>& shape)
         : n_dim(shape.size()), shape(shape), is_view(false) {
-        if (shape.empty()) {
-            throw std::invalid_argument("Invalid tensor dimensions.");
-        }
 
         // Calculate strides and allocate memory
         calculate_strides();
@@ -54,9 +57,6 @@ template <typename T> class Tensor {
     // Constructor without data copy
     Tensor(T* input_data, std::size_t data_len, const std::vector<std::size_t>& shape, bool is_view)
         : n_dim(shape.size()), shape(shape), is_view(is_view) {
-        if (data_len == 0 || shape.empty()) {
-            throw std::invalid_argument("Invalid tensor dimensions or data length.");
-        }
 
         // Calculate strides
         calculate_strides();
@@ -74,6 +74,10 @@ template <typename T> class Tensor {
 
     // Print method
     void print(std::ostream& os = std::cout) const {
+        if (shape.size() == 0) {
+            os << "Scalar: " << data[0] << "\n";
+            return;
+        }
         os << "Tensor: {\n";
         print_recursive(os, 0, data.get());
         os << "\nShape: [";
@@ -172,6 +176,8 @@ template <typename T> class TensorIterator {
     T* data_ptr;
     std::vector<std::size_t> strides;
     std::vector<std::size_t> shape;
+    std::size_t global_index;
+    std::size_t num_elements;
     bool finished;
     bool started;
 
@@ -179,11 +185,11 @@ template <typename T> class TensorIterator {
     // Constructor
     TensorIterator(T* data, const std::vector<std::size_t>& shape,
                    const std::vector<std::size_t>& strides)
-        : data_ptr(data), shape(shape), strides(strides), finished(false), started(false) {
-        if (shape.empty() || strides.empty()) {
-            throw std::invalid_argument("Shape and strides must not be empty.");
-        }
+        : data_ptr(data), shape(shape), strides(strides), finished(false), started(false),
+          global_index(0) {
         current_indices.resize(shape.size(), 0);
+        num_elements =
+            std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
     }
 
     // Get next element
@@ -194,6 +200,10 @@ template <typename T> class TensorIterator {
         if (!started) {
             started = true;
             return data_ptr;
+        }
+        if (global_index >= num_elements) {
+            finished = true;
+            return nullptr;
         }
 
         // Increment indices
@@ -213,6 +223,9 @@ template <typename T> class TensorIterator {
         for (std::size_t i = 0; i < current_indices.size(); ++i) {
             offset += current_indices[i] * strides[i];
         }
+
+        global_index++;
+
         return data_ptr + offset;
     }
 

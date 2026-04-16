@@ -54,4 +54,7 @@ def lib():
     ]
     lib.get_add_operation_result.restype = None
 
+    lib.create_tensor_scalar_py.argtypes = [ctypes.c_float]
+    lib.create_tensor_scalar_py.restype = ctypes.POINTER(CTensor)
+
     return lib

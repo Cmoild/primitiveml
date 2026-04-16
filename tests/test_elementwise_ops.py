@@ -14,6 +14,9 @@ import pytest
         ([3, 1], [1, 4]),
         ([100, 1], [1, 200]),
         ([1, 5, 1], [1, 1, 7]),
+        ([], [2, 15, 13]),
+        ([], []),
+        ([1, 15, 13], []),
     ],
 )
 def test_add_operation_contiguous_non_scalar(
@@ -29,18 +32,26 @@ def test_add_operation_contiguous_non_scalar(
 
         out = np.empty(shape=expected.shape, dtype=np.float32)
 
-        pml_c_t1_p = lib.create_tensor_py(
-            t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            t1.size,
-            (ctypes.c_size_t * t1.ndim)(*t1.shape),
-            t1.ndim,
-        )
-        pml_c_t2_p = lib.create_tensor_py(
-            t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            t2.size,
-            (ctypes.c_size_t * t2.ndim)(*t2.shape),
-            t2.ndim,
-        )
+        pml_c_t1_p = None
+        pml_c_t2_p = None
+        if t1.ndim > 0:
+            pml_c_t1_p = lib.create_tensor_py(
+                t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                t1.size,
+                (ctypes.c_size_t * t1.ndim)(*t1.shape),
+                t1.ndim,
+            )
+        else:
+            pml_c_t1_p = lib.create_tensor_scalar_py(ctypes.c_float(float(t1)))
+        if t2.ndim > 0:
+            pml_c_t2_p = lib.create_tensor_py(
+                t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                t2.size,
+                (ctypes.c_size_t * t2.ndim)(*t2.shape),
+                t2.ndim,
+            )
+        else:
+            pml_c_t2_p = lib.create_tensor_scalar_py(ctypes.c_float(float(t2)))
         out_num_elems = ctypes.c_size_t(0)
         lib.get_add_operation_result(
             pml_c_t1_p,

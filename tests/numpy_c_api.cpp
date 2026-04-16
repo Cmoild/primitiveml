@@ -12,6 +12,8 @@ typedef struct CTensor {
 CTensor* create_tensor_py(const float* data, const size_t data_num_elems, const size_t* shape,
                           const size_t ndim);
 
+CTensor* create_tensor_scalar_py(const float scalar_value);
+
 void destroy_tensor_py(CTensor* tensor);
 
 void get_tensor_shape_py(CTensor* tensor, const size_t** out_shape, size_t* out_ndim);
@@ -53,4 +55,14 @@ void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t*
     *out_num_elems = result.get_data_num_elems();
 
     std::cout << result << std::endl;
+}
+
+CTensor* create_tensor_scalar_py(const float scalar_value) {
+    CTensor* out = (CTensor*)malloc(sizeof(CTensor));
+
+    pml::Tensor<float>* tensor = new pml::Tensor<float>(scalar_value);
+
+    out->handle = (void*)tensor;
+
+    return out;
 }
