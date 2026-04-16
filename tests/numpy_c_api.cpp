@@ -16,9 +16,12 @@ CTensor* create_tensor_scalar_py(const float scalar_value);
 
 void destroy_tensor_py(CTensor* tensor);
 
-void get_tensor_shape_py(CTensor* tensor, const size_t** out_shape, size_t* out_ndim);
+void get_tensor_shape_py(CTensor* tensor, size_t* out_shape, size_t* out_ndim);
 
 void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems);
+
+void get_sum_operation_result(CTensor* operand, const size_t axis, const bool keep_dims,
+                              float* out_data, size_t* out_num_elems);
 }
 
 CTensor* create_tensor_py(const float* data, const size_t data_num_elems, const size_t* shape,
@@ -34,27 +37,35 @@ CTensor* create_tensor_py(const float* data, const size_t data_num_elems, const 
 }
 
 void destroy_tensor_py(CTensor* tensor) {
-    pml::Tensor<float>* cpp_tensor = (pml::Tensor<float>*)tensor->handle;
+    pml::Tensor<float>* cpp_tensor = static_cast<pml::Tensor<float>*>(tensor->handle);
     delete cpp_tensor;
 }
 
-void get_tensor_shape_py(CTensor* tensor, const size_t** out_shape, size_t* out_ndim) {
-    pml::Tensor<float>* cpp_tensor = (pml::Tensor<float>*)tensor->handle;
+void get_tensor_shape_py(CTensor* tensor, size_t* out_shape, size_t* out_ndim) {
+    pml::Tensor<float>* cpp_tensor = static_cast<pml::Tensor<float>*>(tensor->handle);
     const std::vector<std::size_t>* shape_v = &cpp_tensor->get_shape();
-    *out_shape = shape_v->data();
+    std::copy(shape_v->begin(), shape_v->end(), out_shape);
     *out_ndim = shape_v->size();
 }
 
 void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems) {
-    auto* cpp_t1 = (pml::Tensor<float>*)t1->handle;
-    auto* cpp_t2 = (pml::Tensor<float>*)t2->handle;
+    auto* cpp_t1 = static_cast<pml::Tensor<float>*>(t1->handle);
+    auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
 
     pml::Tensor<float> result = pml::add(*cpp_t1, *cpp_t2);
 
     std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
     *out_num_elems = result.get_data_num_elems();
+}
 
-    std::cout << result << std::endl;
+void get_sum_operation_result(CTensor* operand, const size_t axis, const bool keep_dims,
+                              float* out_data, size_t* out_num_elems) {
+    auto* cpp_operand = static_cast<pml::Tensor<float>*>(operand->handle);
+
+    pml::Tensor<float> result = pml::sum(*cpp_operand, axis, keep_dims);
+
+    std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
+    *out_num_elems = result.get_data_num_elems();
 }
 
 CTensor* create_tensor_scalar_py(const float scalar_value) {

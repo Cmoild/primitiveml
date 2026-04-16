@@ -199,6 +199,7 @@ template <typename T> class TensorIterator {
         }
         if (!started) {
             started = true;
+            global_index++;
             return data_ptr;
         }
         if (global_index >= num_elements) {
@@ -277,13 +278,9 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
     TensorIterator<T> right_iter(right.get_data(), result_shape, right_strides);
     TensorIterator<T> result_iter(result.get_data(), result.get_shape(), result.get_strides());
 
-    for (;;) {
+    while (auto* out = result_iter.next()) {
         auto* l = left_iter.next();
         auto* r = right_iter.next();
-        auto* out = result_iter.next();
-
-        if (result_iter.is_finished())
-            break;
 
         *out = op(*l, *r);
     };
@@ -297,6 +294,61 @@ template <typename T> inline T add_operation(const T& left, const T& right) {
 
 template <typename T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right) {
     return elementwise_operation(left, right, add_operation<T>);
+}
+
+template <typename T, typename Op>
+inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t axis,
+                                     const bool keep_dims, Op op) {
+    std::vector<std::size_t> transopsed_shape = operand.get_shape();
+    std::vector<std::size_t> transopsed_strides = operand.get_strides();
+    std::size_t shape_at_axis = 0;
+
+    if (axis >= 0 && axis < transopsed_shape.size() && axis < transopsed_strides.size()) {
+        shape_at_axis = transopsed_shape[axis];
+        std::size_t stride_at_axis = transopsed_strides[axis];
+        transopsed_shape.erase(transopsed_shape.begin() + axis);
+        transopsed_strides.erase(transopsed_strides.begin() + axis);
+        transopsed_shape.push_back(shape_at_axis);
+        transopsed_strides.push_back(stride_at_axis);
+    } else {
+        throw std::invalid_argument("Axis is out of bounds.");
+    }
+
+    std::vector<std::size_t> result_shape = operand.get_shape();
+    if (keep_dims) {
+        result_shape[axis] = 1;
+    } else {
+        result_shape.erase(result_shape.begin() + axis);
+    }
+
+    Tensor<T> result(result_shape);
+
+    TensorIterator<T> iterator_result(result.get_data(), result.get_shape(), result.get_strides());
+
+    TensorIterator<T> iterator_operand(operand.get_data(), transopsed_shape, transopsed_strides);
+
+    op(iterator_result, iterator_operand, shape_at_axis);
+
+    return result;
+}
+
+template <typename T>
+inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
+                                    TensorIterator<T>& iterator_operand,
+                                    const std::size_t axis_size) {
+    while (auto* res = iterator_result.next()) {
+        *res = T{};
+        for (std::size_t i = 0; i < axis_size; i++) {
+            auto* o = iterator_operand.next();
+
+            *res += *o;
+        }
+    }
+}
+
+template <typename T>
+Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_dims = false) {
+    return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
 }
 
 } // namespace pml

@@ -19,7 +19,7 @@ import pytest
         ([1, 15, 13], []),
     ],
 )
-def test_add_operation_contiguous_non_scalar(
+def test_add_operation_contiguous(
     lib: ctypes.CDLL, t1_shape: list[int], t2_shape: list[int]
 ):
     rng = np.random.default_rng(42)

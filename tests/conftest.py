@@ -41,7 +41,7 @@ def lib():
 
     lib.get_tensor_shape_py.argtypes = [
         ctypes.POINTER(CTensor),
-        ctypes.POINTER(ctypes.POINTER(ctypes.c_size_t)),
+        ctypes.POINTER(ctypes.c_size_t),
         ctypes.POINTER(ctypes.c_size_t),
     ]
     lib.get_tensor_shape_py.restype = None
@@ -56,5 +56,14 @@ def lib():
 
     lib.create_tensor_scalar_py.argtypes = [ctypes.c_float]
     lib.create_tensor_scalar_py.restype = ctypes.POINTER(CTensor)
+
+    lib.get_sum_operation_result.argtypes = [
+        ctypes.POINTER(CTensor),
+        ctypes.c_size_t,
+        ctypes.c_bool,
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+    lib.get_sum_operation_result.restype = None
 
     return lib
