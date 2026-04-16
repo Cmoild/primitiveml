@@ -4,3 +4,7 @@ src/*.bin
 session.vim
 .vscode
 nanogpt/.venv
+__pycache__
+model
+*.vim
+*.txt

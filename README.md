@@ -1,4 +1,4 @@
-# PrimitiveML — Minimal tensor runtime & inference framework in C
+# PrimitiveML — Minimal tensor runtime & inference framework in C [LEGACY]
 
 **PrimitiveML** is a minimalist tensor library and inference framework written in C, inspired by PyTorch.  
 It provides a low-level tensor runtime and a modular layer system (Module/Linear/Embedding) with `forward()`-style calls similar to PyTorch. The repository includes an example of running a small character-based GPT-2 model exported from PyTorch (see `nanogpt).
