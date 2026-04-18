@@ -7,17 +7,20 @@
 #include <memory>
 #include <stdexcept>
 #include <iostream>
+#include <span>
+#include <storage.hpp>
 
 namespace pml {
 
 template <typename T> class Tensor {
   private:
-    std::size_t n_dim;
-    std::vector<std::size_t> shape;
-    std::vector<std::size_t> strides;
-    std::unique_ptr<T[]> data;
-    std::size_t data_num_elems;
-    bool is_view;
+    std::shared_ptr<Storage> storage_;
+    std::size_t offset_ = 0;
+    std::size_t n_dim_;
+    std::vector<std::size_t> shape_;
+    std::vector<std::size_t> strides_;
+    std::size_t data_num_elems_;
+    bool is_view_ = false;
 
   public:
     Tensor(const Tensor&) = delete;
@@ -27,46 +30,43 @@ template <typename T> class Tensor {
     Tensor& operator=(Tensor&&) noexcept = default;
 
     // Constructor with data copy
-    Tensor(const T* input_data, std::size_t data_len, const std::vector<std::size_t>& shape)
-        : n_dim(shape.size()), shape(shape), is_view(false) {
+    Tensor(std::span<const T> input_data, const std::vector<std::size_t>& shape)
+        : n_dim_(shape.size()), shape_(shape), is_view_(false) {
 
         // Calculate strides and allocate memory
         calculate_strides();
-        data_num_elems = calculate_num_elements();
-        data = std::make_unique<T[]>(data_num_elems);
-        std::copy(input_data, input_data + data_num_elems, data.get());
+        data_num_elems_ = calculate_num_elements();
+        // TODO: Finish this
+        storage_ = std::make_shared<Storage>(data_num_elems_ * sizeof(T));
+        std::size_t data = get_data();
+        std::copy(input_data.begin(), input_data.end(), storage_->data());
     }
 
     // Constructor with scalar value
     Tensor(const T scalar_value)
-        : n_dim(0), shape({}), is_view(false), data_num_elems(1), strides({}) {
-        data = std::make_unique<T[]>(data_num_elems);
-        data[0] = scalar_value;
+        : n_dim_(0), shape_({}), is_view_(false), data_num_elems_(1), strides_({}) {
+        data_ = std::make_unique<T[]>(data_num_elems_);
+        data_[0] = scalar_value;
     }
 
     // Constructor with empty data
     Tensor(const std::vector<std::size_t>& shape)
-        : n_dim(shape.size()), shape(shape), is_view(false) {
+        : n_dim_(shape.size()), shape_(shape), is_view_(false) {
 
         // Calculate strides and allocate memory
         calculate_strides();
-        data_num_elems = calculate_num_elements();
-        data = std::make_unique<T[]>(data_num_elems);
+        data_num_elems_ = calculate_num_elements();
+        data_ = std::make_unique<T[]>(data_num_elems_);
     }
 
     // Constructor without data copy
-    Tensor(T* input_data, std::size_t data_len, const std::vector<std::size_t>& shape, bool is_view)
-        : n_dim(shape.size()), shape(shape), is_view(is_view) {
+    Tensor(std::unique_ptr<T[]> input_data, const std::vector<std::size_t>& shape)
+        : n_dim_(shape.size()), shape_(shape), is_view_(false) {
 
         // Calculate strides
         calculate_strides();
-        data_num_elems = calculate_num_elements();
-        if (is_view) {
-            data.reset(input_data, [](T*) {}); // No ownership
-        } else {
-            data = std::make_unique<T[]>(data_num_elems);
-            std::copy(input_data, input_data + data_num_elems, data.get());
-        }
+        data_num_elems_ = calculate_num_elements();
+        data_ = std::move(input_data);
     }
 
     // Destructor
@@ -74,19 +74,19 @@ template <typename T> class Tensor {
 
     // Print method
     void print(std::ostream& os = std::cout) const {
-        if (shape.size() == 0) {
-            os << "Scalar: " << data[0] << "\n";
+        if (shape_.size() == 0) {
+            os << "Scalar: " << data_[0] << "\n";
             return;
         }
         os << "Tensor: {\n";
-        print_recursive(os, 0, data.get());
+        print_recursive(os, 0, data_.get());
         os << "\nShape: [";
-        for (std::size_t i = 0; i < shape.size(); ++i) {
-            os << shape[i] << (i < shape.size() - 1 ? ", " : "");
+        for (std::size_t i = 0; i < shape_.size(); ++i) {
+            os << shape_[i] << (i < shape_.size() - 1 ? ", " : "");
         }
         os << "]\nStrides: [";
-        for (std::size_t i = 0; i < strides.size(); ++i) {
-            os << strides[i] << (i < strides.size() - 1 ? ", " : "");
+        for (std::size_t i = 0; i < strides_.size(); ++i) {
+            os << strides_[i] << (i < strides_.size() - 1 ? ", " : "");
         }
         os << "]\n}";
     }
@@ -98,61 +98,61 @@ template <typename T> class Tensor {
     }
 
     const std::vector<std::size_t>& get_shape() const noexcept {
-        return shape;
+        return shape_;
     }
 
     const std::vector<std::size_t>& get_strides() const noexcept {
-        return strides;
+        return strides_;
     }
 
     T* get_data() const noexcept {
-        return data.get();
+        return static_cast<T*>(storage_->data());
     }
 
     std::size_t get_data_num_elems() const noexcept {
-        return data_num_elems;
+        return data_num_elems_;
     }
 
     bool is_contiguous() const noexcept {
         std::size_t expected = 1;
-        for (std::size_t i = shape.size(); i-- > 0;) {
-            if (strides[i] != expected)
+        for (std::size_t i = shape_.size(); i-- > 0;) {
+            if (strides_[i] != expected)
                 return false;
-            expected *= shape[i];
+            expected *= shape_[i];
         }
         return true;
     }
 
   private:
     void calculate_strides() {
-        strides.resize(n_dim);
+        strides_.resize(n_dim_);
         std::size_t stride = 1;
-        for (std::size_t i = n_dim; i-- > 0;) {
-            strides[i] = stride;
-            stride *= shape[i];
+        for (std::size_t i = n_dim_; i-- > 0;) {
+            strides_[i] = stride;
+            stride *= shape_[i];
         }
     }
 
     std::size_t calculate_num_elements() const {
         std::size_t num_elems = 1;
-        for (std::size_t dim : shape) {
+        for (std::size_t dim : shape_) {
             num_elems *= dim;
         }
         return num_elems;
     }
 
     void print_recursive(std::ostream& os, std::size_t shape_idx, const T* data_ptr) const {
-        if (shape_idx == shape.size() - 1) {
+        if (shape_idx == shape_.size() - 1) {
             os << "[ ";
-            for (std::size_t i = 0; i < shape[shape_idx]; ++i) {
-                os << data_ptr[i * strides[shape_idx]] << (i < shape[shape_idx] - 1 ? " " : "");
+            for (std::size_t i = 0; i < shape_[shape_idx]; ++i) {
+                os << data_ptr[i * strides_[shape_idx]] << (i < shape_[shape_idx] - 1 ? " " : "");
             }
             os << " ]";
         } else {
             os << "[";
-            for (std::size_t i = 0; i < shape[shape_idx]; ++i) {
-                print_recursive(os, shape_idx + 1, data_ptr + i * strides[shape_idx]);
-                if (i < shape[shape_idx] - 1) {
+            for (std::size_t i = 0; i < shape_[shape_idx]; ++i) {
+                print_recursive(os, shape_idx + 1, data_ptr + i * strides_[shape_idx]);
+                if (i < shape_[shape_idx] - 1) {
                     os << ",\n";
                 }
             }

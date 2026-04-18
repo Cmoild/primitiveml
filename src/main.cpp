@@ -7,7 +7,7 @@ int main() {
         1.64457978,
         -1.9741151,
     };
-    pml::Tensor<float> t1(data, sizeof(data) / sizeof(float), {3});
+    pml::Tensor<float> t1(data, {3});
     std::cout << t1 << std::endl;
 
     pml::Tensor<float> t3 = pml::sum(t1, 0, false);
