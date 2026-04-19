@@ -58,7 +58,7 @@ class Storage {
 
     Storage(const std::size_t nbytes, Allocator& allocator, const std::size_t alignment = 0)
         : nbytes_(nbytes), allocator_(&allocator) {
-        data_ = allocator.allocate(nbytes, alignment);
+        data_ = allocator_->allocate(nbytes, alignment);
     }
 
     ~Storage() {

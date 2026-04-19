@@ -1,3 +1,4 @@
+#include "storage.hpp"
 #include <cstddef>
 #include <tensor.hpp>
 #include <vector>
@@ -9,7 +10,7 @@ typedef struct CTensor {
     void* handle;
 } CTensor;
 
-CTensor* create_tensor_py(const float* data, const size_t data_num_elems, const size_t* shape,
+CTensor* create_tensor_py(float* data, const size_t data_num_elems, const size_t* shape,
                           const size_t ndim);
 
 CTensor* create_tensor_scalar_py(const float scalar_value);
@@ -24,12 +25,13 @@ void get_sum_operation_result(CTensor* operand, const size_t axis, const bool ke
                               float* out_data, size_t* out_num_elems);
 }
 
-CTensor* create_tensor_py(const float* data, const size_t data_num_elems, const size_t* shape,
+CTensor* create_tensor_py(float* data, const size_t data_num_elems, const size_t* shape,
                           const size_t ndim) {
     CTensor* out = (CTensor*)malloc(sizeof(CTensor));
     std::vector<std::size_t> shape_v{shape, shape + ndim};
 
-    pml::Tensor<float>* tensor = new pml::Tensor<float>(data, data_num_elems, shape_v);
+    std::span<float> data_span(data, data + data_num_elems);
+    pml::Tensor<float>* tensor = new pml::Tensor<float>(data_span, shape_v);
 
     out->handle = (void*)tensor;
 

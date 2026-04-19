@@ -32,41 +32,42 @@ template <typename T> class Tensor {
     // Constructor with data copy
     Tensor(std::span<const T> input_data, const std::vector<std::size_t>& shape)
         : n_dim_(shape.size()), shape_(shape), is_view_(false) {
-
-        // Calculate strides and allocate memory
         calculate_strides();
         data_num_elems_ = calculate_num_elements();
-        // TODO: Finish this
-        storage_ = std::make_shared<Storage>(data_num_elems_ * sizeof(T));
-        std::size_t data = get_data();
-        std::copy(input_data.begin(), input_data.end(), storage_->data());
+
+        storage_ = make_storage(data_num_elems_ * sizeof(T));
+        std::copy(input_data.begin(), input_data.end(), get_data());
     }
 
     // Constructor with scalar value
     Tensor(const T scalar_value)
         : n_dim_(0), shape_({}), is_view_(false), data_num_elems_(1), strides_({}) {
-        data_ = std::make_unique<T[]>(data_num_elems_);
-        data_[0] = scalar_value;
+        storage_ = make_storage(data_num_elems_ * sizeof(T));
+        *get_data() = scalar_value;
     }
 
     // Constructor with empty data
     Tensor(const std::vector<std::size_t>& shape)
         : n_dim_(shape.size()), shape_(shape), is_view_(false) {
-
-        // Calculate strides and allocate memory
         calculate_strides();
         data_num_elems_ = calculate_num_elements();
-        data_ = std::make_unique<T[]>(data_num_elems_);
+        storage_ = make_storage(data_num_elems_ * sizeof(T));
     }
 
-    // Constructor without data copy
-    Tensor(std::unique_ptr<T[]> input_data, const std::vector<std::size_t>& shape)
+    // Constructor without data copy (moves ownership to tensor)
+    Tensor(std::unique_ptr<Storage> input_data, const std::vector<std::size_t>& shape)
         : n_dim_(shape.size()), shape_(shape), is_view_(false) {
-
-        // Calculate strides
         calculate_strides();
         data_num_elems_ = calculate_num_elements();
-        data_ = std::move(input_data);
+        storage_ = std::move(input_data);
+    }
+
+    // Constructor without data copy (view)
+    Tensor(std::shared_ptr<Storage> input_data, std::size_t offset,
+           const std::vector<std::size_t>& shape, const std::vector<std::size_t>& strides)
+        : n_dim_(shape.size()), shape_(shape), is_view_(true), strides_(strides), offset_(offset) {
+        data_num_elems_ = calculate_num_elements();
+        storage_ = input_data;
     }
 
     // Destructor
@@ -75,11 +76,11 @@ template <typename T> class Tensor {
     // Print method
     void print(std::ostream& os = std::cout) const {
         if (shape_.size() == 0) {
-            os << "Scalar: " << data_[0] << "\n";
+            os << "Scalar: " << *get_data() << "\n";
             return;
         }
         os << "Tensor: {\n";
-        print_recursive(os, 0, data_.get());
+        print_recursive(os, 0, get_data());
         os << "\nShape: [";
         for (std::size_t i = 0; i < shape_.size(); ++i) {
             os << shape_[i] << (i < shape_.size() - 1 ? ", " : "");
@@ -106,7 +107,7 @@ template <typename T> class Tensor {
     }
 
     T* get_data() const noexcept {
-        return static_cast<T*>(storage_->data());
+        return static_cast<T*>(storage_->data()) + offset_;
     }
 
     std::size_t get_data_num_elems() const noexcept {
@@ -158,6 +159,11 @@ template <typename T> class Tensor {
             }
             os << "]";
         }
+    }
+
+    std::shared_ptr<Storage> make_storage(std::size_t nbytes, std::size_t alignment = 0) {
+        static MallocAllocator default_allocator;
+        return std::make_shared<Storage>(nbytes, default_allocator, alignment);
     }
 };
 
