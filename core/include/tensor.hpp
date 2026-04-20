@@ -100,10 +100,64 @@ template <typename T> class Tensor {
         return os;
     }
 
-    template <typename... Args> Tensor<T> operator[](Args... args) {
-        std::variant<std::ptrdiff_t, Slice> indices(args...);
-        std::vector<std::size_t> slice_shape{};
-        std::vector<std::size_t> slice_strides{};
+    template <typename... Args> Tensor<T> operator[](Args&&... args) const {
+        using Index = std::variant<std::ptrdiff_t, Slice>;
+
+        if (sizeof...(Args) > n_dim_) {
+            throw std::invalid_argument("Too many arguments.");
+        }
+
+        std::vector<Index> indices;
+        indices.reserve(sizeof...(Args));
+        (indices.emplace_back(std::forward<Args>(args)), ...);
+
+        std::size_t new_offset = offset_;
+        std::vector<std::size_t> new_shape{};
+        std::vector<std::size_t> new_strides{};
+
+        std::size_t arg_idx = 0;
+        for (std::size_t dim = 0; dim < n_dim_; dim++) {
+            if (arg_idx < indices.size() &&
+                std::holds_alternative<std::ptrdiff_t>(indices[arg_idx])) {
+                std::ptrdiff_t idx = std::get<std::ptrdiff_t>(indices[arg_idx]);
+                if (idx < 0)
+                    idx += static_cast<std::ptrdiff_t>(shape_[dim]);
+
+                if (idx < 0 || static_cast<std::size_t>(idx) >= shape_[dim]) {
+                    throw std::out_of_range("Index is out of range.");
+                }
+
+                new_offset += static_cast<std::size_t>(idx) * strides_[dim];
+                arg_idx++;
+            } else {
+                Slice slc(0, -1, 1);
+                if (arg_idx < indices.size()) {
+                    slc = std::get<Slice>(indices[arg_idx]);
+                    arg_idx++;
+                }
+
+                std::ptrdiff_t start = (slc.start < 0)
+                                           ? slc.start + static_cast<std::ptrdiff_t>(shape_[dim])
+                                           : slc.start;
+                std::ptrdiff_t end = (slc.end < 0)
+                                         ? slc.end + static_cast<std::ptrdiff_t>(shape_[dim]) + 1
+                                         : slc.end;
+
+                if (start < 0 || start > end || static_cast<std::size_t>(end) > shape_[dim] ||
+                    slc.step == 0) {
+                    throw std::out_of_range("Invalid slice.");
+                }
+
+                std::size_t slice_len =
+                    static_cast<std::size_t>((end - start + slc.step - 1) / slc.step);
+
+                new_shape.push_back(slice_len);
+                new_strides.push_back(strides_[dim] * slc.step);
+                new_offset += static_cast<std::size_t>(start) * strides_[dim];
+            }
+        }
+
+        return Tensor<T>(storage_, new_offset, new_shape, new_strides);
     }
 
     const std::vector<std::size_t>& get_shape() const noexcept {
