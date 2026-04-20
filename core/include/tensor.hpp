@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <span>
+#include <variant>
+#include <slice.hpp>
 #include <storage.hpp>
 
 namespace pml {
@@ -96,6 +98,12 @@ template <typename T> class Tensor {
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
         tensor.print(os);
         return os;
+    }
+
+    template <typename... Args> Tensor<T> operator[](Args... args) {
+        std::variant<std::ptrdiff_t, Slice> indices(args...);
+        std::vector<std::size_t> slice_shape{};
+        std::vector<std::size_t> slice_strides{};
     }
 
     const std::vector<std::size_t>& get_shape() const noexcept {
