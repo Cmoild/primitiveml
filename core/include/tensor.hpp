@@ -25,8 +25,11 @@ template <typename T> class Tensor {
     bool is_view_ = false;
 
   public:
-    Tensor(const Tensor&) = delete;
-    Tensor& operator=(const Tensor&) = delete;
+    Tensor(const Tensor& other)
+        : storage_(other.storage_), offset_(other.offset_), n_dim_(other.n_dim_),
+          shape_(other.shape_), strides_(other.strides_), data_num_elems_(other.data_num_elems_),
+          is_view_(other.is_view_) {}
+    Tensor& operator=(const Tensor&) = default;
 
     Tensor(Tensor&&) noexcept = default;
     Tensor& operator=(Tensor&&) noexcept = default;
@@ -105,6 +108,10 @@ template <typename T> class Tensor {
         for (std::size_t i = shape.size(); i-- > 0;) {
             new_strides[i] = stride;
             stride *= shape[i];
+        }
+
+        if (stride != data_num_elems_) {
+            throw std::invalid_argument("Incorrect view shape.");
         }
 
         return Tensor<T>(storage_, offset_, shape, new_strides);

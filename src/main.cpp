@@ -1,20 +1,19 @@
+#include <matmul.hpp>
 #include <slice.hpp>
 #include <tensor.hpp>
 #include <iostream>
 
 int main() {
-    float data[] = {-0.48054148, -1.41560552, -0.81768925, -0.49359604, -1.13949375, 0.56858589,
-                    0.04630868,  0.5937672,   -1.80612649, 0.79860799,  0.04094044,  -0.54713281,
-                    -1.80040832, 0.03186612,  1.154988,    -0.14142765, 0.70132991,  1.08274669,
-                    -0.91094437, 0.21639038,  -1.29521017, -1.54521664, 0.91282814,  -0.24690078};
-    pml::Tensor<float> t(data, {2, 3, 4});
-    std::cout << t << std::endl;
+    float data1[] = {-0.7499, 0.3517, 1.0287, 0.3540, 0.6332, 0.5136, 3.0881, 0.7850, 0.0154};
+    pml::Tensor<float> t1(data1, {3, 3});
+    std::cout << t1 << std::endl;
 
-    pml::Tensor<float> t_slice =
-        pml::as_contiguous_tensor(t[1, pml::Slice(0, -1), pml::Slice(0, -1, 2)]);
-    std::cout << t_slice;
+    float data2[] = {0.9418, -0.0170, -0.2001, -1.9168, 1.2530, 0.3503, 0.7031, -0.8394, -1.0559};
+    pml::Tensor<float> t2(data2, {3, 3});
+    t2 = t2[1];
+    std::cout << t2 << std::endl;
 
-    pml::Tensor<float> t_view = t_slice.view({3 * 2});
-    std::cout << t_view << std::endl;
+    pml::Tensor<float> t_res = pml::matmul(t2, t1);
+    std::cout << t_res << std::endl;
     return 0;
 }
