@@ -94,6 +94,22 @@ template <typename T> class Tensor {
         os << "]\n}";
     }
 
+    Tensor<T> view(const std::vector<std::size_t>& shape) const {
+        if (!is_contiguous()) {
+            throw std::logic_error("Memory is not contiguous to make a view.");
+        }
+
+        std::vector<std::size_t> new_strides;
+        new_strides.resize(shape.size());
+        std::size_t stride = 1;
+        for (std::size_t i = shape.size(); i-- > 0;) {
+            new_strides[i] = stride;
+            stride *= shape[i];
+        }
+
+        return Tensor<T>(storage_, offset_, shape, new_strides);
+    }
+
     // Overload operator<< for printing
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
         tensor.print(os);
@@ -166,6 +182,10 @@ template <typename T> class Tensor {
 
     const std::vector<std::size_t>& get_strides() const noexcept {
         return strides_;
+    }
+
+    const std::size_t ndim() const noexcept {
+        return n_dim_;
     }
 
     T* get_data() const noexcept {
@@ -417,6 +437,26 @@ inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
 template <typename T>
 Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_dims = false) {
     return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
+}
+
+template <typename T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
+    if (operand.is_contiguous()) {
+        // FIXME: Return the same tensor (I need to add copy constructor in Tensor class)
+        throw std::invalid_argument("Tensor must have non-contiguous memory.");
+    }
+
+    Tensor<T> result(operand.get_shape());
+
+    TensorIterator<T> iterator_result(result.get_data(), result.get_shape(), result.get_strides());
+
+    TensorIterator<T> iterator_operand(operand.get_data(), operand.get_shape(),
+                                       operand.get_strides());
+
+    while (auto* res = iterator_result.next()) {
+        *res = *iterator_operand.next();
+    }
+
+    return result;
 }
 
 } // namespace pml

@@ -10,7 +10,11 @@ int main() {
     pml::Tensor<float> t(data, {2, 3, 4});
     std::cout << t << std::endl;
 
-    pml::Tensor<float> t_view = t[pml::Slice(0, 2), pml::Slice(0, 2), pml::Slice(0, -1, 2)];
+    pml::Tensor<float> t_slice =
+        pml::as_contiguous_tensor(t[1, pml::Slice(0, -1), pml::Slice(0, -1, 2)]);
+    std::cout << t_slice;
+
+    pml::Tensor<float> t_view = t_slice.view({3 * 2});
     std::cout << t_view << std::endl;
     return 0;
 }
