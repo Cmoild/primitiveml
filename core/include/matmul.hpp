@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <tensor.hpp>
+#include <tensor_iterator.hpp>
 
 namespace pml {
 
@@ -73,7 +74,102 @@ template <typename T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& r
         return result;
     }
 
-    return Tensor<T>({6, 7, 67});
+    bool left_reshaped = false;
+    bool right_reshaped = false;
+
+    std::vector<std::size_t> shape_left(2);
+    std::vector<std::size_t> strides_left(2);
+
+    if (left.ndim() == 1) {
+        left_reshaped = true;
+        shape_left[0] = 1;
+        shape_left[1] = left.get_shape()[0];
+        strides_left[0] = 0;
+        strides_left[1] = 1;
+    } else {
+        shape_left = left.get_shape();
+    }
+
+    std::vector<std::size_t> shape_right(2);
+    std::vector<std::size_t> strides_right(2);
+
+    if (right.ndim() == 1) {
+        right_reshaped = true;
+        shape_right[0] = right.get_shape()[0];
+        shape_right[1] = 1;
+        strides_right[0] = 1;
+        strides_right[1] = 0;
+    } else {
+        shape_right = right.get_shape();
+    }
+
+    if (shape_left[shape_left.size() - 1] != shape_right[shape_right.size() - 2]) {
+        throw std::invalid_argument("Incompatible matrix shapes.");
+    }
+
+    Tensor<T> l_contiguous = (left.is_contiguous()) ? left : as_contiguous_tensor(left);
+    Tensor<T> r_contiguous = (right.is_contiguous()) ? right : as_contiguous_tensor(right);
+
+    if (l_contiguous.ndim() != 1)
+        strides_left = l_contiguous.get_strides();
+    if (r_contiguous.ndim() != 1)
+        strides_right = r_contiguous.get_strides();
+
+    std::size_t batch_n_dim =
+        (shape_right.size() > shape_left.size()) ? shape_right.size() - 2 : shape_left.size() - 2;
+
+    std::vector<std::size_t> left_batch_shape(shape_left.begin(), shape_left.end() - 2);
+    std::vector<std::size_t> right_batch_shape(shape_right.begin(), shape_right.end() - 2);
+
+    if (!are_shapes_broadcastable(left_batch_shape, right_batch_shape)) {
+        throw std::invalid_argument("Incompatible batch shapes");
+    }
+
+    std::vector<std::size_t> left_batch_strides(strides_left.begin(), strides_left.end() - 2);
+    std::vector<std::size_t> right_batch_strides(strides_right.begin(), strides_right.end() - 2);
+    std::vector<std::size_t> result_batch_shape;
+
+    std::tie(result_batch_shape, left_batch_strides, right_batch_strides) =
+        broadcast_shapes_and_strides(left_batch_shape, left_batch_strides, right_batch_shape,
+                                     right_batch_strides);
+
+    std::vector<std::size_t> result_shape = result_batch_shape;
+    result_shape.push_back(shape_left[shape_left.size() - 2]);
+    result_shape.push_back(shape_right[shape_right.size() - 1]);
+
+    Tensor<T> result(result_shape);
+
+    TensorIterator<T> iterator_left(l_contiguous.get_data(), result_batch_shape,
+                                    left_batch_strides);
+
+    TensorIterator<T> iterator_right(r_contiguous.get_data(), result_batch_shape,
+                                     right_batch_strides);
+
+    std::vector<std::size_t> result_batch_strides(result.get_strides().begin(),
+                                                  result.get_strides().end() - 2);
+    TensorIterator<T> iterator_result(result.get_data(), result_batch_shape, result_batch_strides);
+
+    const std::size_t M = shape_left[shape_left.size() - 2];
+    const std::size_t N = shape_right[shape_right.size() - 1];
+    const std::size_t K = shape_left[shape_left.size() - 1];
+    while (auto* out = iterator_result.next()) {
+        auto* l = iterator_left.next();
+        auto* r = iterator_right.next();
+
+        matmul_kernel(l, r, out, M, N, K);
+    }
+
+    if (right_reshaped || left_reshaped) {
+        if (right_reshaped) {
+            result.reshape_in_place(
+                std::vector<std::size_t>(result_shape.begin(), result_shape.end() - 1));
+        } else {
+            result_shape.erase(result_shape.begin() + result_shape.size() - 2);
+            result.reshape_in_place(result_shape);
+        }
+    }
+
+    return result;
 }
 
 } // namespace pml
