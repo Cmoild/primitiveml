@@ -17,6 +17,7 @@ import pytest
         ([], [2, 15, 13]),
         ([], []),
         ([1, 15, 13], []),
+        ([1000, 1000], [1000, 1000]),
     ],
 )
 def test_add_operation_contiguous(

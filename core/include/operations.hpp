@@ -1,13 +1,15 @@
 #pragma once
 
+#include <cstddef>
 #include <tensor.hpp>
 #include <tensor_iterator.hpp>
 
 namespace pml {
 
 // Elementwise operation template
-template <typename T, typename Op>
-inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& right, Op op) {
+template <typename T, typename Op, typename LoopOp>
+inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& right, Op op,
+                                       LoopOp loop_op) {
     if (!are_shapes_broadcastable(left.get_shape(), right.get_shape())) {
         throw std::invalid_argument("Tensors are not broadcastable.");
     }
@@ -21,12 +23,35 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
     TensorIterator<T> right_iter(right.get_data(), result_shape, right_strides);
     TensorIterator<T> result_iter(result.get_data(), result.get_shape(), result.get_strides());
 
-    while (auto* out = result_iter.next()) {
-        auto* l = left_iter.next();
-        auto* r = right_iter.next();
+    std::size_t gcd_block_sz =
+        std::gcd(left_iter.contiguous_block_size(), right_iter.contiguous_block_size());
+    if (left_iter.contiguous_block_size() == right_iter.contiguous_block_size()) {
+        std::size_t block_sz = left_iter.contiguous_block_size();
+        while (auto* out = result_iter.advance(block_sz)) {
+            auto* l = left_iter.next_contiguous_block();
+            auto* r = right_iter.next_contiguous_block();
 
-        *out = op(*l, *r);
-    };
+            loop_op(l, r, out, block_sz);
+        }
+    } else if (gcd_block_sz == std::min(left_iter.contiguous_block_size(),
+                                        right_iter.contiguous_block_size()) &&
+               std::max(left_iter.contiguous_block_size(), right_iter.contiguous_block_size()) %
+                       gcd_block_sz ==
+                   0) {
+        while (auto* out = result_iter.advance(gcd_block_sz)) {
+            auto* l = left_iter.advance(gcd_block_sz);
+            auto* r = right_iter.advance(gcd_block_sz);
+
+            loop_op(l, r, out, gcd_block_sz);
+        }
+    } else {
+        while (auto* out = result_iter.next()) {
+            auto* l = left_iter.next();
+            auto* r = right_iter.next();
+
+            *out = op(*l, *r);
+        }
+    }
 
     return result;
 }
@@ -35,8 +60,15 @@ template <typename T> inline T add_operation(const T& left, const T& right) {
     return left + right;
 }
 
+template <typename T>
+inline void add_operation_loop(const T* left, const T* right, T* result, const std::size_t n) {
+    for (std::size_t i = 0; i < n; i++) {
+        result[i] = left[i] + right[i];
+    }
+}
+
 template <typename T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right) {
-    return elementwise_operation(left, right, add_operation<T>);
+    return elementwise_operation(left, right, add_operation<T>, add_operation_loop<T>);
 }
 
 template <typename T, typename Op>
@@ -96,7 +128,7 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
 
 template <typename T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
     if (operand.is_contiguous()) {
-        // FIXME: Return the same tensor (I need to add copy constructor in Tensor class)
+        // FIXME: Return the same tensor
         throw std::invalid_argument("Tensor must have non-contiguous memory.");
     }
 
