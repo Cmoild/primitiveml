@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <tensor.hpp>
 #include <operations.hpp>
+#include <matmul.hpp>
 #include <vector>
 #include <cstdlib>
 
@@ -24,6 +25,9 @@ void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t*
 
 void get_sum_operation_result(CTensor* operand, const size_t axis, const bool keep_dims,
                               float* out_data, size_t* out_num_elems);
+
+void get_matmul_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems,
+                                 size_t* out_n_dim);
 }
 
 CTensor* create_tensor_py(float* data, const size_t data_num_elems, const size_t* shape,
@@ -69,6 +73,18 @@ void get_sum_operation_result(CTensor* operand, const size_t axis, const bool ke
 
     std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
     *out_num_elems = result.get_data_num_elems();
+}
+
+void get_matmul_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems,
+                                 size_t* out_n_dim) {
+    auto* cpp_t1 = static_cast<pml::Tensor<float>*>(t1->handle);
+    auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
+
+    pml::Tensor<float> result = pml::matmul(*cpp_t1, *cpp_t2);
+
+    std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
+    *out_num_elems = result.get_data_num_elems();
+    *out_n_dim = result.ndim();
 }
 
 CTensor* create_tensor_scalar_py(const float scalar_value) {

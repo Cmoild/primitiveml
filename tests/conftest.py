@@ -66,4 +66,13 @@ def lib():
     ]
     lib.get_sum_operation_result.restype = None
 
+    lib.get_matmul_operation_result.argtypes = [
+        ctypes.POINTER(CTensor),
+        ctypes.POINTER(CTensor),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_size_t),
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+    lib.get_matmul_operation_result.restype = None
+
     return lib
