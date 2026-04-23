@@ -126,6 +126,25 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
     return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
 }
 
+template <typename T, typename Op>
+Tensor<T> elementwise_unary_operation(const Tensor<T>& operand, Op op) {
+    Tensor<T> result(operand.get_shape());
+
+    TensorIterator<T> iterator_result(result.get_data(), result.get_shape(), result.get_strides());
+
+    TensorIterator<T> iterator_operand(operand.get_data(), operand.get_shape(),
+                                       operand.get_strides());
+
+    std::size_t block_sz = iterator_operand.contiguous_block_size();
+    while (auto* res = iterator_result.advance(block_sz)) {
+        auto* o = iterator_operand.next_contiguous_block();
+
+        op(o, res, block_sz);
+    }
+
+    return result;
+}
+
 template <typename T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
     if (operand.is_contiguous()) {
         // FIXME: Return the same tensor
