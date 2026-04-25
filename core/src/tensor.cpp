@@ -1,8 +1,7 @@
-#include <tensor.hpp>
-#include <stdexcept>
-#include <vector>
-#include <memory>
-#include <algorithm>
+module pml;
+
+import std;
+import :tensor;
 
 namespace pml {
 

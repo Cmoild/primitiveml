@@ -1,12 +1,9 @@
-#pragma once
+export module pml:storage;
 
-#include <alloca.h>
-#include <cstddef>
-#include <cstdlib>
-#include <source_location>
-#include <exceptions.hpp>
+import std;
+import :exceptions;
 
-namespace pml {
+export namespace pml {
 
 class Allocator {
   public:

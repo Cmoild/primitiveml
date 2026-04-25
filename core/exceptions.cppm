@@ -1,8 +1,8 @@
-#include <new>
-#include <source_location>
-#include <string>
+export module pml:exceptions;
 
-namespace pml {
+import std;
+
+export namespace pml {
 
 class custom_bad_alloc : public std::bad_alloc {
   private:

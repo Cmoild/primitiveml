@@ -1,7 +1,8 @@
-#pragma once
+export module pml:slice;
 
-#include <cstddef>
-namespace pml {
+import std;
+
+export namespace pml {
 
 struct Slice {
     std::ptrdiff_t start = 0;

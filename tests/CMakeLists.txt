@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.31)
 
 include(FetchContent)
 
@@ -18,6 +18,8 @@ target_link_libraries(test_broadcastable
         Catch2::Catch2WithMain
 )
 
+target_compile_features(test_broadcastable PUBLIC cxx_std_26)
+
 add_executable(test_broadcasted_strides test_broadcasted_strides.cpp)
 
 target_link_libraries(test_broadcasted_strides
@@ -25,6 +27,8 @@ target_link_libraries(test_broadcasted_strides
         pml_core
         Catch2::Catch2WithMain
 )
+
+target_compile_features(test_broadcasted_strides PUBLIC cxx_std_26)
 
 include(CTest)
 include(Catch)
@@ -39,4 +43,6 @@ if(BUILD_NUMPY_TESTS)
         PRIVATE
             pml_core
     )
+
+    target_compile_features(pmltest PUBLIC cxx_std_26)
 endif()

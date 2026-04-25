@@ -1,18 +1,10 @@
-#pragma once
+export module pml:tensor;
 
-#include <vector>
-#include <cstddef>
-#include <memory>
-#include <stdexcept>
-#include <iostream>
-#include <span>
-#include <variant>
-#include <algorithm>
-#include <numeric>
-#include <slice.hpp>
-#include <storage.hpp>
+import std;
+import :storage;
+import :slice;
 
-namespace pml {
+export namespace pml {
 
 template <typename T> class Tensor {
   private:

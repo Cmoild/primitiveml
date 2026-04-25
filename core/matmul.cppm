@@ -1,11 +1,10 @@
-#pragma once
+export module pml:matmul;
 
-#include <cstddef>
-#include <stdexcept>
-#include <tensor.hpp>
-#include <tensor_iterator.hpp>
+import std;
+import :tensor;
+import :iterator;
 
-namespace pml {
+export namespace pml {
 
 template <typename T>
 void matmul_kernel(const T* left, const T* right, T* res, std::size_t M, std::size_t N,

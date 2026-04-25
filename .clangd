@@ -1,12 +1,4 @@
 CompileFlags:
-  Add: [-std=c++23]
+  Add:
+    - -std=c++26
 
-If:
-  PathMatch: .*
-  CompileFlags:
-    Add: [--experimental-modules-support]
-
-If:
-  PathMatch: .*
-  CompileFlags:
-    Add: [-stdlib=libc++]

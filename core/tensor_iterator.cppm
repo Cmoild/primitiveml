@@ -1,11 +1,9 @@
-#pragma once
+export module pml:iterator;
 
-#include <cstddef>
-#include <stdexcept>
-#include <tensor.hpp>
-#include <numeric>
+import std;
+import :tensor;
 
-namespace pml {
+export namespace pml {
 
 template <typename T> class TensorIterator {
   private:

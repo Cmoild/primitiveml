@@ -1,10 +1,10 @@
-#pragma once
+export module pml:operations;
 
-#include <cstddef>
-#include <tensor.hpp>
-#include <tensor_iterator.hpp>
+import std;
+import :tensor;
+import :iterator;
 
-namespace pml {
+export namespace pml {
 
 // Elementwise operation template
 template <typename T, typename Op, typename LoopOp>
