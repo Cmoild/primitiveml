@@ -7,7 +7,7 @@
 
 namespace pml {
 
-template <typename T> class TensorIterator {
+template <Number T> class TensorIterator {
   private:
     std::vector<std::size_t> current_indices_;
     T* data_ptr_;

@@ -1,13 +1,24 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <tensor.hpp>
 #include <tensor_iterator.hpp>
 
 namespace pml {
 
+template <typename T, typename F>
+concept BinaryElementwiseOp = requires(F f, const T& l, const T& r) {
+    { f(l, r) } -> std::convertible_to<T>;
+};
+
+template <typename T, typename F>
+concept BinaryElementwiseLoopOp = requires(F f, const T* l, const T* r, T* res, std::size_t n) {
+    { f(l, r, res, n) } -> std::same_as<void>;
+};
+
 // Elementwise operation template
-template <typename T, typename Op, typename LoopOp>
+template <Number T, BinaryElementwiseOp<T> Op, BinaryElementwiseLoopOp<T> LoopOp>
 inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& right, Op op,
                                        LoopOp loop_op) {
     if (!are_shapes_broadcastable(left.get_shape(), right.get_shape())) {
@@ -56,24 +67,30 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
     return result;
 }
 
-template <typename T> inline T add_operation(const T& left, const T& right) {
+template <Number T> inline T add_operation(const T& left, const T& right) {
     return left + right;
 }
 
-template <typename T>
+template <Number T>
 inline void add_operation_loop(const T* left, const T* right, T* result, const std::size_t n) {
     for (std::size_t i = 0; i < n; i++) {
         result[i] = left[i] + right[i];
     }
 }
 
-template <typename T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right) {
+template <Number T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right) {
     return elementwise_operation(left, right, add_operation<T>, add_operation_loop<T>);
 }
 
-template <typename T, typename Op>
+template <typename T, typename F>
+concept ReductionKernel =
+    requires(F f, TensorIterator<T>& i_r, TensorIterator<T>& i_o, const std::size_t axis_size) {
+        { f(i_r, i_o, axis_size) } -> std::same_as<void>;
+    };
+
+template <Number T, ReductionKernel<T> Kernel>
 inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t axis,
-                                     const bool keep_dims, Op op) {
+                                     const bool keep_dims, Kernel kernel) {
     std::vector<std::size_t> transopsed_shape = operand.get_shape();
     std::vector<std::size_t> transopsed_strides = operand.get_strides();
     std::size_t shape_at_axis = 0;
@@ -102,12 +119,12 @@ inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t
 
     TensorIterator<T> iterator_operand(operand.get_data(), transopsed_shape, transopsed_strides);
 
-    op(iterator_result, iterator_operand, shape_at_axis);
+    kernel(iterator_result, iterator_operand, shape_at_axis);
 
     return result;
 }
 
-template <typename T>
+template <Number T>
 inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
                                     TensorIterator<T>& iterator_operand,
                                     const std::size_t axis_size) {
@@ -121,12 +138,17 @@ inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
     }
 }
 
-template <typename T>
+template <Number T>
 Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_dims = false) {
     return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
 }
 
-template <typename T, typename Op>
+template <typename T, typename F>
+concept UnaryElementwiseOp = requires(F f, const T* o, T* res, const std::size_t n) {
+    { f(o, res, n) } -> std::same_as<void>;
+};
+
+template <Number T, UnaryElementwiseOp<T> Op>
 Tensor<T> elementwise_unary_operation(const Tensor<T>& operand, Op op) {
     Tensor<T> result(operand.get_shape());
 
@@ -145,7 +167,7 @@ Tensor<T> elementwise_unary_operation(const Tensor<T>& operand, Op op) {
     return result;
 }
 
-template <typename T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
+template <Number T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
     if (operand.is_contiguous()) {
         // FIXME: Return the same tensor
         throw std::invalid_argument("Tensor must have non-contiguous memory.");

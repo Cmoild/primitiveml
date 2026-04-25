@@ -14,7 +14,14 @@
 
 namespace pml {
 
-template <typename T> class Tensor {
+template <typename T>
+concept Number = std::integral<T> || std::floating_point<T>;
+
+template <typename I>
+concept TensorIndex =
+    std::integral<std::remove_cvref_t<I>> || std::same_as<std::remove_cvref_t<I>, Slice>;
+
+template <Number T> class Tensor {
   private:
     std::shared_ptr<Storage> storage_;
     std::size_t offset_ = 0;
@@ -137,7 +144,7 @@ template <typename T> class Tensor {
         return os;
     }
 
-    template <typename... Args> Tensor<T> operator[](Args&&... args) const {
+    template <TensorIndex... Args> Tensor<T> operator[](Args&&... args) const {
         using Index = std::variant<std::ptrdiff_t, Slice>;
 
         if (sizeof...(Args) > n_dim_) {

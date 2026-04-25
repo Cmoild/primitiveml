@@ -7,7 +7,7 @@
 
 namespace pml {
 
-template <typename T>
+template <Number T>
 void matmul_kernel(const T* left, const T* right, T* res, std::size_t M, std::size_t N,
                    std::size_t K) {
     for (std::size_t i = 0; i < M; i++) {
@@ -20,7 +20,7 @@ void matmul_kernel(const T* left, const T* right, T* res, std::size_t M, std::si
     }
 }
 
-template <typename T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& right) {
+template <Number T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& right) {
     if (left.ndim() == 0 || right.ndim() == 0) {
         throw std::invalid_argument("Tensor shapes are incompatible with matmul op.");
     }
