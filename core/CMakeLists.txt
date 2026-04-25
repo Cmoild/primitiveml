@@ -7,9 +7,6 @@ set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 find_package(OpenMP REQUIRED)
 
 add_library(pml_core
-    src/dynarray.c
-    src/tensor.c
-    src/tensor_iterator.c
     src/tensor.cpp
 )
 
