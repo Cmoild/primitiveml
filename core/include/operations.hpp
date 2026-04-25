@@ -7,12 +7,12 @@
 
 namespace pml {
 
-template <typename T, typename F>
+template <typename F, typename T>
 concept BinaryElementwiseOp = requires(F f, const T& l, const T& r) {
     { f(l, r) } -> std::convertible_to<T>;
 };
 
-template <typename T, typename F>
+template <typename F, typename T>
 concept BinaryElementwiseLoopOp = requires(F f, const T* l, const T* r, T* res, std::size_t n) {
     { f(l, r, res, n) } -> std::same_as<void>;
 };
@@ -82,7 +82,7 @@ template <Number T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right)
     return elementwise_operation(left, right, add_operation<T>, add_operation_loop<T>);
 }
 
-template <typename T, typename F>
+template <typename F, typename T>
 concept ReductionKernel =
     requires(F f, TensorIterator<T>& i_r, TensorIterator<T>& i_o, const std::size_t axis_size) {
         { f(i_r, i_o, axis_size) } -> std::same_as<void>;
@@ -143,7 +143,7 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
     return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
 }
 
-template <typename T, typename F>
+template <typename F, typename T>
 concept UnaryElementwiseOp = requires(F f, const T* o, T* res, const std::size_t n) {
     { f(o, res, n) } -> std::same_as<void>;
 };

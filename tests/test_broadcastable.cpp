@@ -19,7 +19,7 @@ TEST_CASE("Tensor broadcasting", "[broadcast]") {
     }
 
     SECTION("Different dims, right-aligned ones") {
-        pml::Tensor<float> t1({3});
+        pml::Tensor<float> t1(std::vector<std::size_t>{3});
         pml::Tensor<float> t2({3, 3});
 
         REQUIRE(pml::are_shapes_broadcastable(t1.get_shape(), t2.get_shape()));
@@ -27,7 +27,7 @@ TEST_CASE("Tensor broadcasting", "[broadcast]") {
 
     SECTION("Different dims, right-aligned ones (swapped)") {
         pml::Tensor<float> t1({3, 3});
-        pml::Tensor<float> t2({3});
+        pml::Tensor<float> t2(std::vector<std::size_t>{3});
 
         REQUIRE(pml::are_shapes_broadcastable(t1.get_shape(), t2.get_shape()));
     }
@@ -54,7 +54,7 @@ TEST_CASE("Tensor broadcasting", "[broadcast]") {
     }
 
     SECTION("Non-broadcastable: different dims, no ones") {
-        pml::Tensor<float> t1({2});
+        pml::Tensor<float> t1(std::vector<std::size_t>{2});
         pml::Tensor<float> t2({2, 3});
 
         REQUIRE_FALSE(pml::are_shapes_broadcastable(t1.get_shape(), t2.get_shape()));
@@ -62,7 +62,7 @@ TEST_CASE("Tensor broadcasting", "[broadcast]") {
 
     SECTION("3D and 1D broadcastable") {
         pml::Tensor<float> t1({2, 2, 3});
-        pml::Tensor<float> t2({3});
+        pml::Tensor<float> t2(std::vector<std::size_t>{3});
 
         REQUIRE(pml::are_shapes_broadcastable(t1.get_shape(), t2.get_shape()));
     }
