@@ -8,4 +8,5 @@ nanogpt/.venv
 __pycache__
 Session.vim
 *.txt
-
+docs
+include/module.hpp

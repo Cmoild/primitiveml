@@ -3,13 +3,15 @@
 #include <tensor.hpp>
 #include <operations.hpp>
 #include <iostream>
+#include <math_kernels.h>
 
 int main() {
-    pml::Tensor<float> t1({5000, 5000});
+    alignas(32) float data[] = {1., 2., 3., 4., 5., 6., 7., 8., 8.,
+                                7., 6., 5., 4., 3., 2., 1., 2., 1.};
+    exp_avx2_aligned(data, data, 18);
 
-    float data2[] = {};
-    pml::Tensor<float> t2({5000, 5000});
-
-    pml::Tensor<float> t_res = pml::add(t2, t2);
+    for (std::size_t i = 0; i < 18; i++)
+        std::cout << data[i] << ' ';
+    std::cout << std::endl;
     return 0;
 }
