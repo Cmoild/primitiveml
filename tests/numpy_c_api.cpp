@@ -3,6 +3,7 @@
 #include <tensor.hpp>
 #include <operations.hpp>
 #include <matmul.hpp>
+#include <math_kernels.h>
 #include <vector>
 #include <cstdlib>
 
@@ -28,6 +29,8 @@ void get_sum_operation_result(CTensor* operand, const size_t axis, const bool ke
 
 void get_matmul_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems,
                                  size_t* out_n_dim);
+
+void test_fast_exp(float* v, size_t n);
 }
 
 CTensor* create_tensor_py(float* data, const size_t data_num_elems, const size_t* shape,
@@ -85,6 +88,11 @@ void get_matmul_operation_result(CTensor* t1, CTensor* t2, float* out_data, size
     std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
     *out_num_elems = result.get_data_num_elems();
     *out_n_dim = result.ndim();
+}
+
+void test_fast_exp(float* v, size_t n) {
+    // TODO: add cpu flags check
+    exp_avx2_aligned(v, v, n);
 }
 
 CTensor* create_tensor_scalar_py(const float scalar_value) {

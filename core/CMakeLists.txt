@@ -1,6 +1,7 @@
 project(pml_core LANGUAGES C CXX ASM)
 
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -g0 -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -g0 -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 

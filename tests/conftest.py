@@ -75,4 +75,9 @@ def lib():
     ]
     lib.get_matmul_operation_result.restype = None
 
+    lib.test_fast_exp.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_size_t
+    ]
+
     return lib
