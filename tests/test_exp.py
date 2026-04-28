@@ -9,7 +9,7 @@ def test_exp(
     rng = np.random.default_rng(42)
 
     for _ in range(100):
-        expected = rng.normal(size=(3000,)).astype(np.float32)
+        expected = rng.normal(size=(3005,)).astype(np.float32)
         out = np.copy(expected)
 
         expected = np.exp(expected)

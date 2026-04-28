@@ -1,8 +1,8 @@
 project(pml_core LANGUAGES C CXX ASM)
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -g0 -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -g0 -fno-omit-frame-pointer")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -g -fno-omit-frame-pointer -mavx2 -mfma")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -g -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer -mavx2 -mfma")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
 
 find_package(OpenMP REQUIRED)
@@ -10,6 +10,7 @@ find_package(OpenMP REQUIRED)
 add_library(pml_core
     src/tensor.cpp
     src/exp_avx2.S
+    src/exp_avx2_intrin.cpp
 )
 
 target_include_directories(pml_core

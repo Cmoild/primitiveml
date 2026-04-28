@@ -1,13 +1,10 @@
 #include <cstddef>
-#include <matmul.hpp>
-#include <slice.hpp>
-#include <tensor.hpp>
-#include <operations.hpp>
 #include <iostream>
 #include <math_kernels.h>
+#include <ctime>
 
-const std::size_t data_size = 5000000;
-static std::clock_t total_aligned = 0;
+const std::size_t data_size = 500000;
+static std::clock_t total_intrin = 0;
 static std::clock_t total_unaligned = 0;
 
 void init_data(float* data) {
@@ -15,28 +12,32 @@ void init_data(float* data) {
         data[i] = static_cast<float>(rand() % 1000 - 500) / 100;
 }
 
-void run_aligned(float* data, float* out) {
-    std::clock_t start = clock();
-    for (std::size_t i = 0; i < 1000; i++) {
-        exp_avx2_aligned(data, out, data_size);
-    }
-    std::clock_t end = clock();
-
-    std::cout << "Aligned: " << end - start << std::endl;
-
-    total_aligned += end - start;
-}
-
 void run_unaligned(float* data, float* out) {
     std::clock_t start = clock();
+    float checksum = 0;
     for (std::size_t i = 0; i < 1000; i++) {
-        exp_avx2_unaligned(data, out, data_size);
+        exp_avx2(data, out, data_size);
+        checksum += out[i];
     }
     std::clock_t end = clock();
 
-    std::cout << "Unaligned: " << end - start << std::endl;
+    std::cout << "Unaligned: " << end - start << "\tchecksum: " << checksum << std::endl;
 
     total_unaligned += end - start;
+}
+
+void run_intrin(float* data, float* out) {
+    std::clock_t start = clock();
+    float checksum = 0;
+    for (std::size_t i = 0; i < 1000; i++) {
+        exp_avx2_intrin(data, out, data_size);
+        checksum += out[i];
+    }
+    std::clock_t end = clock();
+
+    std::cout << "Intrin: " << end - start << "\t\tchecksum: " << checksum << std::endl;
+
+    total_intrin += end - start;
 }
 
 int main() {
@@ -45,23 +46,23 @@ int main() {
 
     init_data(data);
 
-    for (std::size_t i = 0; i < 10; i++) {
-        if (rand() % 2 == 0) {
-            run_aligned(data, out);
-            run_unaligned(data, out);
-        } else {
-            run_unaligned(data, out);
-            run_aligned(data, out);
-        }
+    for (std::size_t i = 0; i < 30; i++) {
 
+        if (rand() % 2 == 0) {
+            run_unaligned(data, out);
+            run_intrin(data, out);
+        } else {
+            run_intrin(data, out);
+            run_unaligned(data, out);
+        }
         if (i < 2) {
-            total_aligned = 0;
+            total_intrin = 0;
             total_unaligned = 0;
         }
     }
 
-    std::cout << "Avg aligned: " << total_aligned / 8 << std::endl;
-    std::cout << "Avg unaligned: " << total_unaligned / 8 << std::endl;
+    std::cout << "Avg intrin: " << total_intrin / 28 << std::endl;
+    std::cout << "Avg unaligned: " << total_unaligned / 28 << std::endl;
 
     free(data);
     free(out);

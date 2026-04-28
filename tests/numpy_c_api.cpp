@@ -92,7 +92,7 @@ void get_matmul_operation_result(CTensor* t1, CTensor* t2, float* out_data, size
 
 void test_fast_exp(float* v, size_t n) {
     // TODO: add cpu flags check
-    exp_avx2_aligned(v, v, n);
+    exp_avx2(v, v, n);
 }
 
 CTensor* create_tensor_scalar_py(const float scalar_value) {
