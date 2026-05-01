@@ -11,6 +11,7 @@ add_library(pml_core
     src/tensor.cpp
     src/exp_avx2.S
     src/exp_avx2_intrin.cpp
+    src/cpu_flags.S
 )
 
 target_include_directories(pml_core
