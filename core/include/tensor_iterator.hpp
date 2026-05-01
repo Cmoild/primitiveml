@@ -31,6 +31,8 @@ template <Number T> class TensorIterator {
 
         std::size_t expected_stride = 1;
         for (std::size_t i = shape.size(); i-- > 0;) {
+            if (shape[i] == 1)
+                continue;
             if (strides[i] != expected_stride)
                 break;
 
@@ -121,7 +123,7 @@ template <Number T> class TensorIterator {
     }
 
     T* advance(std::size_t n) {
-        if (contiguous_block_size_ % n != 0) {
+        if (contiguous_block_size_ % n != 0 && n != 0) {
             throw std::invalid_argument("Incorrect iterator step.");
         }
         if (finished_) {
@@ -199,6 +201,7 @@ template <Number T> class TensorIterator {
         std::fill(current_indices_.begin(), current_indices_.end(), 0);
         finished_ = false;
         started_ = false;
+        global_index_ = 0;
     }
 };
 
