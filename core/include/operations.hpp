@@ -9,34 +9,64 @@
 
 namespace pml {
 
-template <Number T> inline T add_operation(const T& left, const T& right) {
-    return left + right;
-}
-
-template <Number T>
-inline void add_operation_loop(const T* left, const T* right, T* result, const std::size_t n) {
-    for (std::size_t i = 0; i < n; i++) {
-        result[i] = left[i] + right[i];
+struct AddOp {
+    template <Number T> constexpr T operator()(T a, T b) const {
+        return a + b;
     }
-}
+};
 
-template <Number T> inline T subtract_operation(const T& left, const T& right) {
-    return left - right;
-}
-
-template <Number T>
-inline void subtract_operation_loop(const T* left, const T* right, T* result, const std::size_t n) {
-    for (std::size_t i = 0; i < n; i++) {
-        result[i] = left[i] - right[i];
+struct SubtractOp {
+    template <Number T> constexpr T operator()(T a, T b) const {
+        return a - b;
     }
-}
+};
+
+struct MultiplyOp {
+    template <Number T> constexpr T operator()(T a, T b) const {
+        return a * b;
+    }
+};
+
+struct DivideOp {
+    template <Number T> constexpr T operator()(T a, T b) const {
+        return a / b;
+    }
+};
 
 template <Number T> Tensor<T> add(const Tensor<T>& left, const Tensor<T>& right) {
-    return elementwise_operation(left, right, add_operation<T>, add_operation_loop<T>);
+    using AddKernel = BinaryElementwiseKernelBase<T, AddOp>;
+    return elementwise_operation<T, AddKernel>(left, right);
 }
 
 template <Number T> Tensor<T> operator+(const Tensor<T>& left, const Tensor<T>& right) {
     return add(left, right);
+}
+
+template <Number T> Tensor<T> subtract(const Tensor<T>& left, const Tensor<T>& right) {
+    using SubtractKernel = BinaryElementwiseKernelBase<T, SubtractOp>;
+    return elementwise_operation<T, SubtractKernel>(left, right);
+}
+
+template <Number T> Tensor<T> operator-(const Tensor<T>& left, const Tensor<T>& right) {
+    return subtract(left, right);
+}
+
+template <Number T> Tensor<T> multiply(const Tensor<T>& left, const Tensor<T>& right) {
+    using MultiplyKernel = BinaryElementwiseKernelBase<T, MultiplyOp>;
+    return elementwise_operation<T, MultiplyKernel>(left, right);
+}
+
+template <Number T> Tensor<T> operator*(const Tensor<T>& left, const Tensor<T>& right) {
+    return multiply(left, right);
+}
+
+template <Number T> Tensor<T> divide(const Tensor<T>& left, const Tensor<T>& right) {
+    using DivideKernel = BinaryElementwiseKernelBase<T, DivideOp>;
+    return elementwise_operation<T, DivideKernel>(left, right);
+}
+
+template <Number T> Tensor<T> operator/(const Tensor<T>& left, const Tensor<T>& right) {
+    return divide(left, right);
 }
 
 template <Number T>

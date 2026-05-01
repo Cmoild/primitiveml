@@ -5,20 +5,52 @@
 
 namespace pml {
 
-template <typename F, typename T>
-concept BinaryElementwiseOp = requires(F f, const T& l, const T& r) {
-    { f(l, r) } -> std::convertible_to<T>;
+template <typename K, typename T>
+concept BinaryElementwiseKernel =
+    requires(const T* l, const T* r, T* res, std::size_t n, const T& a, const T& b) {
+        { K::scalar_scalar(a, b) } -> std::convertible_to<T>;
+        { K::vector_vector(l, r, res, n) } -> std::same_as<void>;
+        { K::scalar_vector(a, r, res, n) } -> std::same_as<void>;
+        { K::vector_scalar(l, b, res, n) } -> std::same_as<void>;
+    };
+
+template <typename Op, typename T>
+concept BinaryOp = requires(Op op, T a, T b) {
+    { op(a, b) } -> std::convertible_to<T>;
 };
 
-template <typename F, typename T>
-concept BinaryElementwiseLoopOp = requires(F f, const T* l, const T* r, T* res, std::size_t n) {
-    { f(l, r, res, n) } -> std::same_as<void>;
+template <Number T, BinaryOp<T> Op> class BinaryElementwiseKernelBase {
+  protected:
+    BinaryElementwiseKernelBase() = default;
+
+  public:
+    static inline T scalar_scalar(const T& left, const T& right) {
+        return Op{}(left, right);
+    }
+
+    static inline void vector_vector(const T* left, const T* right, T* result,
+                                     const std::size_t n) {
+        for (std::size_t i = 0; i < n; i++) {
+            result[i] = Op{}(left[i], right[i]);
+        }
+    }
+
+    static inline void scalar_vector(const T& left, const T* right, T* result,
+                                     const std::size_t n) {
+        for (std::size_t i = 0; i < n; i++) {
+            result[i] = Op{}(left, right[i]);
+        }
+    }
+
+    static inline void vector_scalar(const T* left, const T& right, T* result,
+                                     const std::size_t n) {
+        scalar_vector(right, left, result, n);
+    }
 };
 
 // Elementwise operation template
-template <Number T, BinaryElementwiseOp<T> Op, BinaryElementwiseLoopOp<T> LoopOp>
-inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& right, Op op,
-                                       LoopOp loop_op) {
+template <Number T, BinaryElementwiseKernel<T> Kernel>
+inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& right) {
     if (!are_shapes_broadcastable(left.get_shape(), right.get_shape())) {
         throw std::invalid_argument("Tensors are not broadcastable.");
     }
@@ -40,7 +72,7 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
             auto* l = left_iter.next_contiguous_block();
             auto* r = right_iter.next_contiguous_block();
 
-            loop_op(l, r, out, block_sz);
+            Kernel::vector_vector(l, r, out, block_sz);
         }
     } else if (gcd_block_sz == std::min(left_iter.contiguous_block_size(),
                                         right_iter.contiguous_block_size()) &&
@@ -51,14 +83,14 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
             auto* l = left_iter.advance(gcd_block_sz);
             auto* r = right_iter.advance(gcd_block_sz);
 
-            loop_op(l, r, out, gcd_block_sz);
+            Kernel::vector_vector(l, r, out, gcd_block_sz);
         }
     } else {
         while (auto* out = result_iter.next()) {
             auto* l = left_iter.next();
             auto* r = right_iter.next();
 
-            *out = op(*l, *r);
+            *out = Kernel::scalar_scalar(*l, *r);
         }
     }
 
