@@ -9,6 +9,7 @@
 #include <variant>
 #include <algorithm>
 #include <numeric>
+#include <concepts>
 #include <slice.hpp>
 #include <storage.hpp>
 

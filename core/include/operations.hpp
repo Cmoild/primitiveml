@@ -1,11 +1,15 @@
 #pragma once
 
-#include <concepts>
 #include <cstddef>
+#include <cmath>
+#include <concepts>
 #include <tensor.hpp>
 #include <tensor_iterator.hpp>
 #include <binary_elementwise_op.hpp>
 #include <reduction_op.hpp>
+#include <unary_elementwise_op.hpp>
+#include <cpu_flags.h>
+#include <math_kernels.h>
 
 namespace pml {
 
@@ -76,8 +80,14 @@ inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
     while (auto* res = iterator_result.next()) {
         *res = T{};
         auto* o = iterator_operand.advance(axis_size);
-        for (std::size_t i = 0; i < axis_size; i++) {
-            *res += *(o + stride * i);
+        if (stride == 1) {
+            for (std::size_t i = 0; i < axis_size; i++) {
+                *res += o[i];
+            }
+        } else {
+            for (std::size_t i = 0; i < axis_size; i++) {
+                *res += *(o + stride * i);
+            }
         }
     }
 }
@@ -87,28 +97,36 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
     return reduction_operation(operand, axis, keep_dims, reduction_operation_sum<T>);
 }
 
-template <typename F, typename T>
-concept UnaryElementwiseOp = requires(F f, const T* o, T* res, const std::size_t n) {
-    { f(o, res, n) } -> std::same_as<void>;
-};
+template <typename T> void exp_kernel(const T*, T*, std::size_t) = delete;
 
-template <Number T, UnaryElementwiseOp<T> Op>
-Tensor<T> elementwise_unary_operation(const Tensor<T>& operand, Op op) {
-    Tensor<T> result(operand.get_shape());
+template <> inline void exp_kernel<float>(const float* o, float* res, std::size_t n) {
+#if defined(__x86_64__) && !defined(_WIN64)
+    static const bool has_avx2_fma = avx2_fma_supported();
 
-    TensorIterator<T> iterator_result(result.get_data(), result.get_shape(), result.get_strides());
-
-    TensorIterator<T> iterator_operand(operand.get_data(), operand.get_shape(),
-                                       operand.get_strides());
-
-    std::size_t block_sz = iterator_operand.contiguous_block_size();
-    while (auto* res = iterator_result.advance(block_sz)) {
-        auto* o = iterator_operand.next_contiguous_block();
-
-        op(o, res, block_sz);
+    if (has_avx2_fma) {
+        exp_avx2(const_cast<float*>(o), res, n);
+    } else {
+        for (std::size_t i = 0; i < n; ++i) {
+            res[i] = std::expf(o[i]);
+        }
     }
+#else
+    for (std::size_t i = 0; i < n; ++i) {
+        res[i] = std::expf(o[i]);
+    }
+#endif
+}
 
-    return result;
+template <> inline void exp_kernel<double>(const double* o, double* res, std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) {
+        res[i] = std::exp(o[i]);
+    }
+}
+
+template <typename T>
+    requires std::same_as<T, float> || std::same_as<T, double>
+Tensor<T> exp(const Tensor<T>& operand) {
+    return elementwise_unary_operation(operand, exp_kernel<T>);
 }
 
 template <Number T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
