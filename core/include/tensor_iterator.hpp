@@ -123,9 +123,6 @@ template <Number T> class TensorIterator {
     }
 
     T* advance(std::size_t n) {
-        if (contiguous_block_size_ % n != 0 && n != 0) {
-            throw std::invalid_argument("Incorrect iterator step.");
-        }
         if (finished_) {
             return nullptr;
         }
@@ -168,23 +165,46 @@ template <Number T> class TensorIterator {
         return data_ptr_ + offset;
     }
 
-    // Get element by index
-    T* at(std::size_t idx) const {
-        std::vector<std::size_t> indices(shape_.size(), 0);
-        for (std::ptrdiff_t i = shape_.size() - 1; i >= 0; --i) {
-            indices[i] = idx % shape_[i];
-            idx /= shape_[i];
+    std::vector<T*> get_block_addresses(std::size_t block_sz) const {
+        std::size_t acc = 1;
+        bool valid = false;
+        for (std::size_t i = shape_.size(); i-- > 0;) {
+            valid = acc == block_sz;
+            if (valid)
+                break;
+            acc *= shape_[i];
         }
-        if (idx > 0) {
-            throw std::out_of_range("Index out of bounds.");
+        if (!valid || num_elements_ % block_sz != 0) {
+            throw std::invalid_argument("Invalid block size");
         }
 
-        // Calculate offset
-        std::size_t offset = 0;
-        for (std::size_t i = 0; i < indices.size(); ++i) {
-            offset += indices[i] * strides_[i];
+        std::vector<T*> addresses(num_elements_ / block_sz, nullptr);
+
+        std::vector<std::size_t> indices(current_indices_.size(), 0);
+
+        addresses[0] = data_ptr_;
+        for (std::size_t block = 1; block < num_elements_ / block_sz; block++) {
+            std::size_t offset = 0;
+            std::size_t carry = block_sz;
+
+            for (std::ptrdiff_t i = indices.size() - 1; i >= 0; --i) {
+                std::size_t sum = indices[i] + carry;
+                indices[i] = sum % shape_[i];
+                carry = sum / shape_[i];
+
+                if (carry == 0) {
+                    break;
+                }
+            }
+
+            for (std::size_t i = 0; i < indices.size(); ++i) {
+                offset += indices[i] * strides_[i];
+            }
+
+            addresses[block] = data_ptr_ + offset;
         }
-        return data_ptr_ + offset;
+
+        return addresses;
     }
 
     // Check if iteration is finished

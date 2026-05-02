@@ -72,13 +72,12 @@ template <Number T> Tensor<T> operator/(const Tensor<T>& left, const Tensor<T>& 
 template <Number T>
 inline void reduction_operation_sum(TensorIterator<T>& iterator_result,
                                     TensorIterator<T>& iterator_operand,
-                                    const std::size_t axis_size) {
+                                    const std::size_t axis_size, const std::size_t stride) {
     while (auto* res = iterator_result.next()) {
         *res = T{};
+        auto* o = iterator_operand.advance(axis_size);
         for (std::size_t i = 0; i < axis_size; i++) {
-            auto* o = iterator_operand.next();
-
-            *res += *o;
+            *res += *(o + stride * i);
         }
     }
 }

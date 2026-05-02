@@ -6,10 +6,10 @@
 namespace pml {
 
 template <typename F, typename T>
-concept ReductionKernel =
-    requires(F f, TensorIterator<T>& i_r, TensorIterator<T>& i_o, const std::size_t axis_size) {
-        { f(i_r, i_o, axis_size) } -> std::same_as<void>;
-    };
+concept ReductionKernel = requires(F f, TensorIterator<T>& i_r, TensorIterator<T>& i_o,
+                                   const std::size_t axis_size, const std::size_t stride) {
+    { f(i_r, i_o, axis_size, stride) } -> std::same_as<void>;
+};
 
 template <Number T, ReductionKernel<T> Kernel>
 inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t axis,
@@ -17,10 +17,11 @@ inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t
     std::vector<std::size_t> transopsed_shape = operand.get_shape();
     std::vector<std::size_t> transopsed_strides = operand.get_strides();
     std::size_t shape_at_axis = 0;
+    std::size_t stride_at_axis = 0;
 
     if (axis >= 0 && axis < transopsed_shape.size() && axis < transopsed_strides.size()) {
         shape_at_axis = transopsed_shape[axis];
-        std::size_t stride_at_axis = transopsed_strides[axis];
+        stride_at_axis = transopsed_strides[axis];
         transopsed_shape.erase(transopsed_shape.begin() + axis);
         transopsed_strides.erase(transopsed_strides.begin() + axis);
         transopsed_shape.push_back(shape_at_axis);
@@ -42,7 +43,7 @@ inline Tensor<T> reduction_operation(const Tensor<T>& operand, const std::size_t
 
     TensorIterator<T> iterator_operand(operand.get_data(), transopsed_shape, transopsed_strides);
 
-    kernel(iterator_result, iterator_operand, shape_at_axis);
+    kernel(iterator_result, iterator_operand, shape_at_axis, stride_at_axis);
 
     return result;
 }
