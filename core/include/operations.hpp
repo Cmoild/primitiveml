@@ -104,7 +104,7 @@ template <> inline void exp_kernel<float>(const float* o, float* res, std::size_
     static const bool has_avx2_fma = avx2_fma_supported();
 
     if (has_avx2_fma) {
-        exp_avx2(const_cast<float*>(o), res, n);
+        exp_avx2(o, res, n);
     } else {
         for (std::size_t i = 0; i < n; ++i) {
             res[i] = std::expf(o[i]);
