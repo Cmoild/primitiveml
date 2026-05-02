@@ -24,6 +24,14 @@ void get_tensor_shape_py(CTensor* tensor, size_t* out_shape, size_t* out_ndim);
 
 void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems);
 
+void get_subtract_operation_result(CTensor* t1, CTensor* t2, float* out_data,
+                                   size_t* out_num_elems);
+
+void get_multiply_operation_result(CTensor* t1, CTensor* t2, float* out_data,
+                                   size_t* out_num_elems);
+
+void get_divide_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems);
+
 void get_sum_operation_result(CTensor* operand, const size_t axis, const bool keep_dims,
                               float* out_data, size_t* out_num_elems);
 
@@ -63,6 +71,38 @@ void get_add_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t*
     auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
 
     pml::Tensor<float> result = pml::add(*cpp_t1, *cpp_t2);
+
+    std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
+    *out_num_elems = result.get_data_num_elems();
+}
+
+void get_subtract_operation_result(CTensor* t1, CTensor* t2, float* out_data,
+                                   size_t* out_num_elems) {
+    auto* cpp_t1 = static_cast<pml::Tensor<float>*>(t1->handle);
+    auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
+
+    pml::Tensor<float> result = pml::subtract(*cpp_t1, *cpp_t2);
+
+    std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
+    *out_num_elems = result.get_data_num_elems();
+}
+
+void get_multiply_operation_result(CTensor* t1, CTensor* t2, float* out_data,
+                                   size_t* out_num_elems) {
+    auto* cpp_t1 = static_cast<pml::Tensor<float>*>(t1->handle);
+    auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
+
+    pml::Tensor<float> result = pml::multiply(*cpp_t1, *cpp_t2);
+
+    std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
+    *out_num_elems = result.get_data_num_elems();
+}
+
+void get_divide_operation_result(CTensor* t1, CTensor* t2, float* out_data, size_t* out_num_elems) {
+    auto* cpp_t1 = static_cast<pml::Tensor<float>*>(t1->handle);
+    auto* cpp_t2 = static_cast<pml::Tensor<float>*>(t2->handle);
+
+    pml::Tensor<float> result = pml::divide(*cpp_t1, *cpp_t2);
 
     std::copy(result.get_data(), result.get_data() + result.get_data_num_elems(), out_data);
     *out_num_elems = result.get_data_num_elems();

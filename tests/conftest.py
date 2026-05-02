@@ -54,6 +54,15 @@ def lib():
     ]
     lib.get_add_operation_result.restype = None
 
+    lib.get_subtract_operation_result.argtypes = lib.get_add_operation_result.argtypes
+    lib.get_subtract_operation_result.restype = None
+
+    lib.get_multiply_operation_result.argtypes = lib.get_add_operation_result.argtypes
+    lib.get_multiply_operation_result.restype = None
+
+    lib.get_divide_operation_result.argtypes = lib.get_add_operation_result.argtypes
+    lib.get_divide_operation_result.restype = None
+
     lib.create_tensor_scalar_py.argtypes = [ctypes.c_float]
     lib.create_tensor_scalar_py.restype = ctypes.POINTER(CTensor)
 

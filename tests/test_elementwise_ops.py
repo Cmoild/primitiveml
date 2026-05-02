@@ -20,16 +20,24 @@ import pytest
         ([1000, 1000], [1000, 1000]),
     ],
 )
-def test_add_operation_contiguous(
+def test_elementwise_operations_contiguous(
     lib: ctypes.CDLL, t1_shape: list[int], t2_shape: list[int]
 ):
     rng = np.random.default_rng(42)
 
+    ops = {
+        'add': [np.add, lib.get_add_operation_result],
+        'subtract': [np.subtract, lib.get_subtract_operation_result],
+        'multiply': [np.multiply, lib.get_multiply_operation_result],
+        'divide': [np.divide, lib.get_divide_operation_result],
+    }
+
     for _ in range(100):
+        choice = rng.choice(['add', 'subtract', 'multiply', 'divide'])
         t1 = rng.normal(size=t1_shape).astype(np.float32)
         t2 = rng.normal(size=t2_shape).astype(np.float32)
 
-        expected = t1 + t2
+        expected = ops[choice][0](t1, t2)
 
         out = np.empty(shape=expected.shape, dtype=np.float32)
 
@@ -54,7 +62,7 @@ def test_add_operation_contiguous(
         else:
             pml_c_t2_p = lib.create_tensor_scalar_py(ctypes.c_float(float(t2)))
         out_num_elems = ctypes.c_size_t(0)
-        lib.get_add_operation_result(
+        ops[choice][1](
             pml_c_t1_p,
             pml_c_t2_p,
             out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
