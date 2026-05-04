@@ -1,5 +1,6 @@
 #pragma once
 #include <concepts>
+#include <numeric>
 #include <tensor.hpp>
 #include <tensor_iterator.hpp>
 
@@ -44,9 +45,21 @@ template <Number T, BinaryOp<T> Op> class BinaryElementwiseKernelBase {
 
     static inline void vector_scalar(const T* left, const T& right, T* result,
                                      const std::size_t n) {
-        scalar_vector(right, left, result, n);
+        for (std::size_t i = 0; i < n; i++) {
+            result[i] = Op{}(left[i], right);
+        }
     }
 };
+
+inline std::size_t scalar_broadcast_len(const std::vector<std::size_t>& strides) {
+    std::size_t n_broadcasted_dims = 0;
+    for (std::size_t i = strides.size(); i-- > 0;) {
+        if (strides[i] != 0)
+            break;
+        n_broadcasted_dims++;
+    }
+    return n_broadcasted_dims;
+}
 
 // Elementwise operation template
 template <Number T, BinaryElementwiseKernel<T> Kernel>
@@ -74,24 +87,71 @@ inline Tensor<T> elementwise_operation(const Tensor<T>& left, const Tensor<T>& r
 
             Kernel::vector_vector(l, r, out, block_sz);
         }
-    } else if (gcd_block_sz == std::min(left_iter.contiguous_block_size(),
-                                        right_iter.contiguous_block_size()) &&
-               std::max(left_iter.contiguous_block_size(), right_iter.contiguous_block_size()) %
-                       gcd_block_sz ==
-                   0) {
+        return result;
+    }
+
+    if (gcd_block_sz != 1 &&
+        gcd_block_sz ==
+            std::min(left_iter.contiguous_block_size(), right_iter.contiguous_block_size()) &&
+        std::max(left_iter.contiguous_block_size(), right_iter.contiguous_block_size()) %
+                gcd_block_sz ==
+            0) {
         while (auto* out = result_iter.advance(gcd_block_sz)) {
             auto* l = left_iter.advance(gcd_block_sz);
             auto* r = right_iter.advance(gcd_block_sz);
 
             Kernel::vector_vector(l, r, out, gcd_block_sz);
         }
-    } else {
-        while (auto* out = result_iter.next()) {
-            auto* l = left_iter.next();
-            auto* r = right_iter.next();
+        return result;
+    }
 
-            *out = Kernel::scalar_scalar(*l, *r);
+    std::size_t left_scalar_suffix_len = scalar_broadcast_len(left_strides);
+    std::size_t right_scalar_suffix_len = scalar_broadcast_len(right_strides);
+    if (gcd_block_sz == 1 && ((left_scalar_suffix_len > 0 && right_scalar_suffix_len == 0 &&
+                               right_iter.contiguous_block_size() > 1) ||
+                              (left_scalar_suffix_len == 0 && right_scalar_suffix_len > 0 &&
+                               left_iter.contiguous_block_size() > 1))) {
+        if (right_scalar_suffix_len == 0) {
+
+            std::size_t logic_block_sz =
+                std::accumulate(result_shape.end() - left_scalar_suffix_len, result_shape.end(), 1,
+                                std::multiplies<std::size_t>());
+            std::size_t contiguous_vec_len =
+                std::gcd(logic_block_sz, right_iter.contiguous_block_size());
+
+            while (auto* l = left_iter.advance(logic_block_sz)) {
+
+                for (std::size_t i = 0; i < logic_block_sz / contiguous_vec_len; i++) {
+                    auto* r = right_iter.advance(contiguous_vec_len);
+                    auto* out = result_iter.advance(contiguous_vec_len);
+
+                    Kernel::scalar_vector(*l, r, out, contiguous_vec_len);
+                }
+            }
+        } else {
+
+            std::size_t logic_block_sz =
+                std::accumulate(result_shape.end() - right_scalar_suffix_len, result_shape.end(), 1,
+                                std::multiplies<std::size_t>());
+            std::size_t contiguous_vec_len =
+                std::gcd(logic_block_sz, left_iter.contiguous_block_size());
+            while (auto* r = right_iter.advance(logic_block_sz)) {
+                for (std::size_t i = 0; i < logic_block_sz / contiguous_vec_len; i++) {
+                    auto* l = left_iter.advance(contiguous_vec_len);
+                    auto* out = result_iter.advance(contiguous_vec_len);
+
+                    Kernel::vector_scalar(l, *r, out, contiguous_vec_len);
+                }
+            }
         }
+        return result;
+    }
+
+    while (auto* out = result_iter.next()) {
+        auto* l = left_iter.next();
+        auto* r = right_iter.next();
+
+        *out = Kernel::scalar_scalar(*l, *r);
     }
 
     return result;
