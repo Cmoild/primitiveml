@@ -10,3 +10,5 @@ Session.vim
 *.txt
 docs
 include/module.hpp
+nanogpt/*
+nanogpt
