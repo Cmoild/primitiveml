@@ -12,7 +12,8 @@ void exp_avx2(const float* operand, float* result, size_t n);
 void exp_avx2_intrin(float* operand, float* result, size_t n);
 
 void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t k,
-          const bool a_transposed, const bool b_transposed, const float alpha, const float beta);
+          const bool a_transposed, const bool b_transposed, const float alpha, const float beta,
+          const size_t lda, const size_t ldb);
 
 #ifdef __cplusplus
 }
