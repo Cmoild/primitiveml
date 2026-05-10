@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <tensor.hpp>
 #include <tensor_iterator.hpp>
+#include <math_kernels.h>
+#include <cpu_flags.h>
 
 namespace pml {
 
@@ -19,6 +21,28 @@ void matmul_kernel(const T* left, const T* right, T* res, std::size_t M, std::si
         }
     }
 }
+
+template <typename T> struct MatmulBackend {
+    static void run(const T* l, const T* r, T* out, std::size_t M, std::size_t N, std::size_t K) {
+        matmul_kernel(l, r, out, M, N, K);
+    }
+};
+
+template <> struct MatmulBackend<float> {
+    static void run(const float* l, const float* r, float* out, std::size_t M, std::size_t N,
+                    std::size_t K) {
+#if defined(__x86_64__) && !defined(_WIN64)
+        static const bool has_avx2_fma = avx2_fma_supported();
+        if (has_avx2_fma) {
+            gemm(l, r, out, M, N, K, false, false, 1.f, 0.f, K, N, N);
+        } else {
+            matmul_kernel(l, r, out, M, N, K);
+        }
+#else
+        matmul_kernel(l, r, out, M, N, K);
+#endif
+    }
+};
 
 template <Number T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& right) {
     if (left.ndim() == 0 || right.ndim() == 0) {
@@ -68,8 +92,8 @@ template <Number T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& rig
         }
         Tensor<T> result(result_shape);
 
-        matmul_kernel(l_contiguous.get_data(), r_contiguous.get_data(), result.get_data(),
-                      shape_left[0], shape_right[1], shape_left[1]);
+        MatmulBackend<T>::run(l_contiguous.get_data(), r_contiguous.get_data(), result.get_data(),
+                              shape_left[0], shape_right[1], shape_left[1]);
 
         return result;
     }
@@ -156,7 +180,7 @@ template <Number T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& rig
         auto* l = iterator_left.next();
         auto* r = iterator_right.next();
 
-        matmul_kernel(l, r, out, M, N, K);
+        MatmulBackend<T>::run(l, r, out, M, N, K);
     }
 
     if (right_reshaped || left_reshaped) {

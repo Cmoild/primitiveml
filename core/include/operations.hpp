@@ -107,12 +107,12 @@ template <> inline void exp_kernel<float>(const float* o, float* res, std::size_
         exp_avx2(o, res, n);
     } else {
         for (std::size_t i = 0; i < n; ++i) {
-            res[i] = std::expf(o[i]);
+            res[i] = std::exp(o[i]);
         }
     }
 #else
     for (std::size_t i = 0; i < n; ++i) {
-        res[i] = std::expf(o[i]);
+        res[i] = std::exp(o[i]);
     }
 #endif
 }
