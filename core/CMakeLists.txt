@@ -12,6 +12,8 @@ add_library(pml_core
     src/exp_avx2.S
     src/exp_avx2_intrin.cpp
     src/cpu_flags.S
+    src/gemm.c
+    src/gemm_microkernel_avx2.S
 )
 
 target_include_directories(pml_core

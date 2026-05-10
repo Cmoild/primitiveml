@@ -26,11 +26,20 @@ target_link_libraries(test_broadcasted_strides
         Catch2::Catch2WithMain
 )
 
+add_executable(test_gemm test_gemm.cpp)
+
+target_link_libraries(test_gemm
+    PRIVATE
+        pml_core
+        Catch2::Catch2WithMain
+)
+
 include(CTest)
 include(Catch)
 
 catch_discover_tests(test_broadcastable)
 catch_discover_tests(test_broadcasted_strides)
+catch_discover_tests(test_gemm)
 
 if(BUILD_NUMPY_TESTS)
     add_library(pmltest SHARED numpy_c_api.cpp)
