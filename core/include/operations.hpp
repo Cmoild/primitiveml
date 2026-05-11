@@ -151,6 +151,24 @@ template <Number T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
     return result;
 }
 
+template <Number T> void inplace_copy(const Tensor<T>& dst, const Tensor<T>& src) {
+    if (dst.get_shape() != src.get_shape()) {
+        throw std::invalid_argument("Tensor shapes are different");
+    }
+
+    TensorIterator<T> iterator_src(src.get_data(), src.get_shape(), src.get_strides());
+
+    TensorIterator<T> iterator_dst(dst.get_data(), dst.get_shape(), dst.get_strides());
+
+    std::size_t gcd_block_sz =
+        std::gcd(iterator_dst.contiguous_block_size(), iterator_src.contiguous_block_size());
+    while (auto* d = iterator_dst.advance(gcd_block_sz)) {
+        auto* s = iterator_src.advance(gcd_block_sz);
+
+        std::copy(s, s + gcd_block_sz, d);
+    }
+}
+
 template <Number U, Number T> Tensor<U> cast(const Tensor<T>& operand) {
     Tensor<U> result(operand.get_shape());
 
