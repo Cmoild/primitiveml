@@ -1,35 +1,43 @@
-# PrimitiveML — Minimal tensor runtime & inference framework in C
+# PrimitiveML: tensor runtime and inference framework in C++
 
-**PrimitiveML** is a minimalist tensor library and inference framework written in C, inspired by PyTorch.  
-It provides a low-level tensor runtime and a modular layer system (Module/Linear/Embedding) with `forward()`-style calls similar to PyTorch. The repository includes an example of running a small character-based GPT-2 model exported from PyTorch (see `nanogpt).
+**PrimitiveML** is a minimalist tensor library and inference framework written in C++, C and x86-64 Assembly, inspired by PyTorch and NumPy.
+It provides a low-level tensor runtime and a modular layer system with `forward()`-style calls, similar to PyTorch.
 
 ## Features
 
-- Low-level tensor runtime with dynamic shapes, dtypes and strides.
-- Tensor ops: `reshape`, `transpose`, `unsqueeze`.
-- Element-wise ops with automatic broadcasting, reductions and matrix multiplication.
-- Basic activations: ReLU, Sigmoid, Softmax.
-- Modular API: `Module`, `Linear`, `Embedding` with `forward()` semantics.
-- Demo: inference of a small char-based GPT-2 model exported from PyTorch.
-- CLI for text generation.
+- Low-level tensor runtime with dynamic shapes and strides.
+- Element-wise operations with automatic broadcasting, reductions and matrix multiplication.
+- Modular API: `Module`, `Linear` and `forward()` semantics.
+- No dependencies: the library implements everything from low-level kernels to high-level abstractions.
+- C++23 and C23 standards are used.
+- Testing in Python with `NumPy` and in C++ with `Catch2`.
 
 ## Requirements
 
-- C compiler (clang or gcc)
+- C++ compiler (Clang or GCC)
+- C compiler (Clang or GCC)
 - CMake
-- Python + PyTorch (if you want to run example notebook)
+- Python (if you want to run tests)
+- x86-64 CPU with AVX2 and FMA support to run optimized math kernels (Unix-only, since the System V ABI is used)
 
 ## Build
 
-From the repository root:
+From the repository root, compile `src/main.cpp` in debug mode:
 
 ```sh
-mkdir build && cd build
-cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      -DCMAKE_CXX_COMPILER=clang++ \
-      -DCMAKE_C_COMPILER=clang \
-      ..
-make
+make debug
+```
+
+From the repository root, compile `src/main.cpp` in release mode:
+
+```sh
+make release
+```
+
+From the repository root, compile the shared library for Python tests:
+
+```sh
+make test
 ```
 
 ## Project layout
@@ -37,13 +45,32 @@ make
 ```
 .
 ├── CMakeLists.txt
-├── core/          # tensor implementation
-├── include/       # public headers (modules, functional, layers)
-├── nanogpt/       # Jupyter notebook and PyTorch model code
-├── src/           # C implementation of layers & CLI
-└── tests/         # unit tests
+├── LICENCE.md
+├── Makefile
+├── README.md
+├── build
+├── core           # tensor implementation
+├── include        # API of ML modules
+├── pyrightconfig.json
+├── src
+└── tests          # C++ and Python tests
 ```
 
 ## Tests
 
-Tests are experimental and incomplete. Some unit tests exist, but coverage is partial and many modules are not yet tested. Use with caution.
+C++ tests are implemented with `Catch2`. To run tests you need to execute the following commands:
+
+```sh
+make test
+cd build/
+ctest
+```
+
+Tests in Python are implemented with `pytest` and `NumPy`.
+The goal of Python tests is to check correctness of different math operations.
+To run Python tests you need to execute the following commands:
+
+```sh
+make test
+pytest
+```
