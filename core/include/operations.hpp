@@ -129,6 +129,16 @@ Tensor<T> exp(const Tensor<T>& operand) {
     return elementwise_unary_operation(operand, exp_kernel<T>);
 }
 
+template <Number T> inline void relu_kernel(const T* o, T* res, std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) {
+        res[i] = std::max(o[i], T{});
+    }
+}
+
+template <Number T> Tensor<T> relu(const Tensor<T>& operand) {
+    return elementwise_unary_operation(operand, relu_kernel<T>);
+}
+
 template <Number T> Tensor<T> as_contiguous_tensor(const Tensor<T>& operand) {
     if (operand.is_contiguous()) {
         return Tensor(operand);

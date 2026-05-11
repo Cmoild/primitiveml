@@ -5,12 +5,7 @@
 #include <matmul.hpp>
 
 int main() {
-    pml::Tensor<int> t({{1, 2, 3, 4}}, {2, 2});
-    pml::Tensor<int> t_dest({{0, 0, 0, 0}}, {4});
-    pml::inplace_copy(t_dest[pml::Slice(0, 2)], t[1]);
-    std::cout << t << std::endl;
-    std::cout << t_dest << std::endl;
-    pml::inplace_copy(t_dest[pml::Slice(1, 4, 2)], t.transpose(0, 1)[0]);
-    std::cout << t_dest << std::endl;
+    pml::Tensor<float> t({{-1.f, 2.f, 3.f, -4.f, 5.f, 6.f}}, {6});
+    std::cout << pml::relu(t) << std::endl;
     return 0;
 }
