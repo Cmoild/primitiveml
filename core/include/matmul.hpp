@@ -185,11 +185,11 @@ template <Number T> Tensor<T> matmul(const Tensor<T>& left, const Tensor<T>& rig
 
     if (right_reshaped || left_reshaped) {
         if (right_reshaped) {
-            result.reshape_in_place(
+            result.reshape_inplace(
                 std::vector<std::size_t>(result_shape.begin(), result_shape.end() - 1));
         } else {
             result_shape.erase(result_shape.begin() + result_shape.size() - 2);
-            result.reshape_in_place(result_shape);
+            result.reshape_inplace(result_shape);
         }
     }
 

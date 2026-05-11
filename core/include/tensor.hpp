@@ -125,7 +125,7 @@ template <Number T> class Tensor {
         return Tensor<T>(storage_, offset_, shape, new_strides);
     }
 
-    void reshape_in_place(const std::vector<std::size_t>& shape) {
+    void reshape_inplace(const std::vector<std::size_t>& shape) {
         if (!is_contiguous()) {
             throw std::logic_error("Memory is not contiguous to reshape tensor.");
         }
@@ -137,6 +137,20 @@ template <Number T> class Tensor {
         shape_ = shape;
         n_dim_ = shape.size();
         calculate_strides();
+    }
+
+    Tensor<T> transpose(const std::size_t idx1, const std::size_t idx2) const {
+        if (idx1 >= n_dim_ || idx2 >= n_dim_) {
+            throw std::invalid_argument("Index is out of range");
+        }
+
+        std::vector<std::size_t> new_shape(shape_.begin(), shape_.end());
+        std::vector<std::size_t> new_strides(strides_.begin(), strides_.end());
+
+        std::swap(new_shape[idx1], new_shape[idx2]);
+        std::swap(new_strides[idx1], new_strides[idx2]);
+
+        return Tensor<T>(storage_, offset_, new_shape, new_strides);
     }
 
     // Overload operator<< for printing
