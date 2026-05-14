@@ -7,7 +7,6 @@ nanogpt/.venv
 *.bin
 __pycache__
 Session.vim
-*.txt
 docs
 nanogpt/*
 nanogpt
