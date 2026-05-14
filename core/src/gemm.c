@@ -121,7 +121,8 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
                     }
 
                     if (mb == MC && nb == NC && kb == KC) {
-                        sgemm_microkernel_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc, alpha);
+                        // sgemm_microkernel_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc, alpha);
+                        sgemm_microkernel4x16_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc, alpha);
                     } else {
                         for (size_t i = 0; i < mb; ++i) {
                             memcpy(Cblk + i * NC, C + (ic + i) * ldc + jc, nb * sizeof(float));
@@ -133,7 +134,8 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
                             memset(Cblk + mb * NC, 0, (MC - mb) * NC * sizeof(float));
                         }
 
-                        sgemm_microkernel_avx2(pack_A, pack_B, Cblk, NC, alpha);
+                        // sgemm_microkernel_avx2(pack_A, pack_B, Cblk, NC, alpha);
+                        sgemm_microkernel4x16_avx2(pack_A, pack_B, Cblk, NC, alpha);
 
                         for (size_t i = 0; i < mb; ++i) {
                             memcpy(C + (ic + i) * ldc + jc, Cblk + i * NC, nb * sizeof(float));

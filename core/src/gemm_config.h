@@ -5,7 +5,4 @@
 #define MC 128
 #define NC 256
 
-#define MR 4
-#define NR 8
-
 #endif

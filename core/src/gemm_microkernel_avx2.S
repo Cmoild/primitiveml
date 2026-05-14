@@ -1,5 +1,8 @@
 #include "gemm_config.h"
 
+#define MR 4
+#define NR 8
+
     .section .text
     .globl sgemm_microkernel_avx2
     .type sgemm_microkernel_avx2, @function

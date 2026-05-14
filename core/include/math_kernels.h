@@ -19,6 +19,9 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
 void sgemm_microkernel_avx2(const float* pack_A, const float* pack_B, float* C, const size_t ldc,
                             float alpha);
 
+void sgemm_microkernel4x16_avx2(const float* pack_A, const float* pack_B, float* C,
+                                const size_t ldc, float alpha);
+
 #ifdef __cplusplus
 }
 #endif
