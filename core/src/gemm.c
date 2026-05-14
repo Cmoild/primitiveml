@@ -22,16 +22,19 @@ static inline void pack_A_panel(const float* A, float* pack_A, const size_t ic, 
 }
 
 static inline void pack_B_panel(const float* B, float* pack_B, const size_t pc, const size_t jc,
-                                bool b_transposed, const size_t ldb) {
+                                bool b_transposed, const size_t ldb, float alpha) {
     if (b_transposed) {
         for (size_t i = 0; i < KC; i++) {
             for (size_t j = 0; j < NC; j++) {
-                pack_B[i * NC + j] = B[(jc + j) * ldb + (pc + i)];
+                pack_B[i * NC + j] = B[(jc + j) * ldb + (pc + i)] * alpha;
             }
         }
     } else {
         for (size_t i = 0; i < KC; i++) {
             memcpy(pack_B + NC * i, B + (pc + i) * ldb + jc, NC * sizeof(float));
+        }
+        for (size_t i = 0; i < KC * NC; i++) {
+            pack_B[i] *= alpha;
         }
     }
 }
@@ -54,17 +57,20 @@ static inline void pack_A_panel_tail(const float* A, float* pack_A, size_t ic, s
 }
 
 static inline void pack_B_panel_tail(const float* B, float* pack_B, size_t pc, size_t jc, size_t kb,
-                                     size_t nb, bool b_transposed, size_t ldb) {
+                                     size_t nb, bool b_transposed, size_t ldb, float alpha) {
     memset(pack_B, 0, KC * NC * sizeof(float));
 
     if (!b_transposed) {
         for (size_t k = 0; k < kb; ++k) {
             memcpy(pack_B + k * NC, B + (pc + k) * ldb + jc, nb * sizeof(float));
         }
+        for (size_t i = 0; i < KC * NC; i++) {
+            pack_B[i] *= alpha;
+        }
     } else {
         for (size_t k = 0; k < kb; ++k) {
             for (size_t j = 0; j < nb; ++j) {
-                pack_B[k * NC + j] = B[(jc + j) * ldb + (pc + k)];
+                pack_B[k * NC + j] = B[(jc + j) * ldb + (pc + k)] * alpha;
             }
         }
     }
@@ -106,9 +112,9 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
                 const size_t kb = (pc + KC <= K) ? KC : (K - pc);
 
                 if (nb == NC && kb == KC) {
-                    pack_B_panel(B, pack_B, pc, jc, b_transposed, ldb);
+                    pack_B_panel(B, pack_B, pc, jc, b_transposed, ldb, alpha);
                 } else {
-                    pack_B_panel_tail(B, pack_B, pc, jc, kb, nb, b_transposed, ldb);
+                    pack_B_panel_tail(B, pack_B, pc, jc, kb, nb, b_transposed, ldb, alpha);
                 }
 
                 for (size_t ic = 0; ic < M; ic += MC) {
@@ -121,8 +127,7 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
                     }
 
                     if (mb == MC && nb == NC && kb == KC) {
-                        // sgemm_microkernel_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc, alpha);
-                        sgemm_microkernel4x16_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc, alpha);
+                        sgemm_microkernel6x16_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc);
                     } else {
                         for (size_t i = 0; i < mb; ++i) {
                             memcpy(Cblk + i * NC, C + (ic + i) * ldc + jc, nb * sizeof(float));
@@ -134,8 +139,7 @@ void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K
                             memset(Cblk + mb * NC, 0, (MC - mb) * NC * sizeof(float));
                         }
 
-                        // sgemm_microkernel_avx2(pack_A, pack_B, Cblk, NC, alpha);
-                        sgemm_microkernel4x16_avx2(pack_A, pack_B, Cblk, NC, alpha);
+                        sgemm_microkernel6x16_avx2(pack_A, pack_B, Cblk, NC);
 
                         for (size_t i = 0; i < mb; ++i) {
                             memcpy(C + (ic + i) * ldc + jc, Cblk + i * NC, nb * sizeof(float));

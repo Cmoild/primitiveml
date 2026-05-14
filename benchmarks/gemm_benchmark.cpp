@@ -35,5 +35,17 @@ int main() {
     }
     std::cout << "Avg: " << all_time / 10 << " ms" << std::endl;
 
+    all_time = 0.;
+    for (std::size_t i = 0; i < 10; i++) {
+        auto start = std::chrono::high_resolution_clock::now();
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.f, A, K, B, N, 0.f, C, N);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double, std::milli> elapsed = end - start;
+        std::cout << "GEMM: " << elapsed.count() << " ms" << std::endl;
+        all_time += elapsed.count();
+    }
+    std::cout << "Avg: " << all_time / 10 << " ms" << std::endl;
+
     return 0;
 }

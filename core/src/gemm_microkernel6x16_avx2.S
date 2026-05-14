@@ -1,13 +1,11 @@
 #include "gemm_config.h"
 
-#define MR 4
+#define MR 6
 #define NR 16
 
 .macro load_broadcast_fma B_row
     vmovups (NC * 4 * \B_row)(%rsi, %r10, 4), %ymm9
     vmovups (NC * 4 * \B_row + 32)(%rsi, %r10, 4), %ymm10
-    vmulps %ymm0, %ymm9, %ymm9
-    vmulps %ymm0, %ymm10, %ymm10
 
     vbroadcastss (%rdi, %rax, 4), %ymm11
     vfmadd231ps %ymm11, %ymm9, %ymm1
@@ -24,17 +22,24 @@
     vbroadcastss (KC * 4 * 3)(%rdi, %rax, 4), %ymm11
     vfmadd231ps %ymm11, %ymm9, %ymm7
     vfmadd231ps %ymm11, %ymm10, %ymm8
+
+    vbroadcastss (KC * 4 * 4)(%rdi, %rax, 4), %ymm11
+    vfmadd231ps %ymm11, %ymm9, %ymm12
+    vfmadd231ps %ymm11, %ymm10, %ymm13
+
+    vbroadcastss (KC * 4 * 5)(%rdi, %rax, 4), %ymm11
+    vfmadd231ps %ymm11, %ymm9, %ymm14
+    vfmadd231ps %ymm11, %ymm10, %ymm15
 .endm
 
     .section .text
-    .globl sgemm_microkernel4x16_avx2
-    .type sgemm_microkernel4x16_avx2, @function
+    .globl sgemm_microkernel6x16_avx2
+    .type sgemm_microkernel6x16_avx2, @function
 # const float* pack_A, const float* pack_B, float* C,
 # const size_t ldc, float alpha,
 # float beta
-sgemm_microkernel4x16_avx2:
+sgemm_microkernel6x16_avx2:
     push %rcx
-    vbroadcastss %xmm0, %ymm0 # alpha
 
     xor %r8, %r8 # pack_A, C row, i
 .LMR_loop:
@@ -60,6 +65,14 @@ sgemm_microkernel4x16_avx2:
     lea (%rdx, %rax, 4), %r10
     vmovups (%r10), %ymm7
     vmovups 0x20(%r10), %ymm8
+    add (%rsp), %rax # ldc * (i + 4) + j
+    lea (%rdx, %rax, 4), %r10
+    vmovups (%r10), %ymm12
+    vmovups 0x20(%r10), %ymm13
+    add (%rsp), %rax # ldc * (i + 5) + j
+    lea (%rdx, %rax, 4), %r10
+    vmovups (%r10), %ymm14
+    vmovups 0x20(%r10), %ymm15
 
     xor %rcx, %rcx # pack_A col, pack_B row, k
 .LKC_loop:
@@ -156,6 +169,14 @@ sgemm_microkernel4x16_avx2:
     lea (%rdx, %rax, 4), %r10
     vmovups %ymm7, (%r10)
     vmovups %ymm8, 0x20(%r10)
+    add (%rsp), %rax # ldc * (i + 4) + j
+    lea (%rdx, %rax, 4), %r10
+    vmovups %ymm12, (%r10)
+    vmovups %ymm13, 0x20(%r10)
+    add (%rsp), %rax # ldc * (i + 5) + j
+    lea (%rdx, %rax, 4), %r10
+    vmovups %ymm14, (%r10)
+    vmovups %ymm15, 0x20(%r10)
 
     add $NR, %r9
     cmp $NC, %r9
@@ -168,4 +189,4 @@ sgemm_microkernel4x16_avx2:
     add $8, %rsp
     vzeroupper
     ret
-    .size sgemm_microkernel4x16_avx2, . - sgemm_microkernel4x16_avx2
+    .size sgemm_microkernel6x16_avx2, . - sgemm_microkernel6x16_avx2
