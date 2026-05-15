@@ -1,45 +1,46 @@
 #include "gemm_config.h"
 
-#define MR 6
-#define NR 16
+#define MR 8
+#define NR 8
 
 .macro load_broadcast_fma k
     vmovaps (NC * 4 * \k)(%r10), %ymm9
+
     vbroadcastss (KC * 4 * 0 + 4 * \k)(%rax), %ymm11
-    vmovaps (NC * 4 * \k + 32)(%r10), %ymm10
     vbroadcastss (KC * 4 * 1 + 4 * \k)(%rax), %ymm0
 
     vfmadd231ps %ymm11, %ymm9, %ymm1
-    vfmadd231ps %ymm11, %ymm10, %ymm2
 
-    vfmadd231ps %ymm0, %ymm9, %ymm3
-    vfmadd231ps %ymm0, %ymm10, %ymm4
+    vfmadd231ps %ymm0, %ymm9, %ymm2
 
     vbroadcastss (KC * 4 * 2 + 4 * \k)(%rax), %ymm11
     vbroadcastss (KC * 4 * 3 + 4 * \k)(%rax), %ymm0
 
-    vfmadd231ps %ymm11, %ymm9, %ymm5
-    vfmadd231ps %ymm11, %ymm10, %ymm6
+    vfmadd231ps %ymm11, %ymm9, %ymm3
 
-    vfmadd231ps %ymm0, %ymm9, %ymm7
-    vfmadd231ps %ymm0, %ymm10, %ymm8
+    vfmadd231ps %ymm0, %ymm9, %ymm4
 
     vbroadcastss (KC * 4 * 4 + 4 * \k)(%rax), %ymm11
     vbroadcastss (KC * 4 * 5 + 4 * \k)(%rax), %ymm0
 
-    vfmadd231ps %ymm11, %ymm9, %ymm12
-    vfmadd231ps %ymm11, %ymm10, %ymm13
+    vfmadd231ps %ymm11, %ymm9, %ymm5
 
-    vfmadd231ps %ymm0, %ymm9, %ymm14
-    vfmadd231ps %ymm0, %ymm10, %ymm15
+    vfmadd231ps %ymm0, %ymm9, %ymm6
+
+    vbroadcastss (KC * 4 * 6 + 4 * \k)(%rax), %ymm11
+    vbroadcastss (KC * 4 * 7 + 4 * \k)(%rax), %ymm0
+
+    vfmadd231ps %ymm11, %ymm9, %ymm7
+
+    vfmadd231ps %ymm0, %ymm9, %ymm8
 .endm
 
     .section .text
-    .globl sgemm_microkernel6x16_avx2
-    .type sgemm_microkernel6x16_avx2, @function
+    .globl sgemm_microkernel8x8_avx2
+    .type sgemm_microkernel8x8_avx2, @function
 # const float* pack_A, const float* pack_B, float* C,
 # const size_t ldc
-sgemm_microkernel6x16_avx2:
+sgemm_microkernel8x8_avx2:
     mov %rcx, %r11
     shl $2, %r11
 
@@ -55,22 +56,20 @@ sgemm_microkernel6x16_avx2:
     add %r9, %rax # ldc * i + j
     lea (%rdx, %rax, 4), %r10 # C + ldc * i + j
     vmovups (%r10), %ymm1 # C[ldc * i + j : ldc * i + j + 8]
-    vmovups 0x20(%r10), %ymm2
     add %r11, %r10 # ldc * (i + 1) + j
-    vmovups (%r10), %ymm3
-    vmovups 0x20(%r10), %ymm4
+    vmovups (%r10), %ymm2
     add %r11, %r10 # ldc * (i + 2) + j
-    vmovups (%r10), %ymm5
-    vmovups 0x20(%r10), %ymm6
+    vmovups (%r10), %ymm3
     add %r11, %r10 # ldc * (i + 3) + j
-    vmovups (%r10), %ymm7
-    vmovups 0x20(%r10), %ymm8
+    vmovups (%r10), %ymm4
     add %r11, %r10 # ldc * (i + 4) + j
-    vmovups (%r10), %ymm12
-    vmovups 0x20(%r10), %ymm13
+    vmovups (%r10), %ymm5
     add %r11, %r10 # ldc * (i + 5) + j
-    vmovups (%r10), %ymm14
-    vmovups 0x20(%r10), %ymm15
+    vmovups (%r10), %ymm6
+    add %r11, %r10 # ldc * (i + 6) + j
+    vmovups (%r10), %ymm7
+    add %r11, %r10 # ldc * (i + 7) + j
+    vmovups (%r10), %ymm8
 
     mov $KC, %rax
     imul %r8, %rax # KC * i
@@ -79,7 +78,6 @@ sgemm_microkernel6x16_avx2:
     xor %r10, %r10
     add %r9, %r10 # + j
     lea (%rsi, %r10, 4), %r10
-
 
     xor %rcx, %rcx # pack_A col, pack_B row, k
 .LKC_loop:
@@ -100,22 +98,6 @@ sgemm_microkernel6x16_avx2:
 
     load_broadcast_fma 7
 
-    load_broadcast_fma 8
-
-    load_broadcast_fma 9
-
-    load_broadcast_fma 10
-
-    load_broadcast_fma 11
-
-    load_broadcast_fma 12
-
-    load_broadcast_fma 13
-
-    load_broadcast_fma 14
-
-    load_broadcast_fma 15
-
     add $NR, %rcx
     add $(NR * 4), %rax # + k * 4
     # + NC * k * 4
@@ -130,22 +112,20 @@ sgemm_microkernel6x16_avx2:
     add %r9, %rax # ldc * i + j
     lea (%rdx, %rax, 4), %r10 # C + ldc * i + j
     vmovups %ymm1, (%r10) # C[ldc * i + j : ldc * i + j + 8]
-    vmovups %ymm2, 0x20(%r10)
     add %r11, %r10 # ldc * (i + 1) + j
-    vmovups %ymm3, (%r10)
-    vmovups %ymm4, 0x20(%r10)
+    vmovups %ymm2, (%r10)
     add %r11, %r10 # ldc * (i + 2) + j
-    vmovups %ymm5, (%r10)
-    vmovups %ymm6, 0x20(%r10)
+    vmovups %ymm3, (%r10)
     add %r11, %r10 # ldc * (i + 3) + j
-    vmovups %ymm7, (%r10)
-    vmovups %ymm8, 0x20(%r10)
+    vmovups %ymm4, (%r10)
     add %r11, %r10 # ldc * (i + 4) + j
-    vmovups %ymm12, (%r10)
-    vmovups %ymm13, 0x20(%r10)
+    vmovups %ymm5, (%r10)
     add %r11, %r10 # ldc * (i + 5) + j
-    vmovups %ymm14, (%r10)
-    vmovups %ymm15, 0x20(%r10)
+    vmovups %ymm6, (%r10)
+    add %r11, %r10 # ldc * (i + 6) + j
+    vmovups %ymm7, (%r10)
+    add %r11, %r10 # ldc * (i + 7) + j
+    vmovups %ymm8, (%r10)
 
     add $NR, %r9
     cmp $NC, %r9
@@ -157,4 +137,4 @@ sgemm_microkernel6x16_avx2:
 .LMR_loop_end:
     vzeroupper
     ret
-    .size sgemm_microkernel6x16_avx2, . - sgemm_microkernel6x16_avx2
+    .size sgemm_microkernel8x8_avx2, . - sgemm_microkernel8x8_avx2

@@ -6,8 +6,8 @@
 #include <threads.h>
 #include "gemm_config.h"
 
-static inline void pack_A_panel(const float* A, float* pack_A, const size_t ic, const size_t jc,
-                                bool a_transposed, const size_t lda) {
+static inline void pack_A_panel(const float* restrict A, float* restrict pack_A, const size_t ic,
+                                const size_t jc, bool a_transposed, const size_t lda) {
     if (a_transposed) {
         for (size_t i = 0; i < MC; i++) {
             for (size_t j = 0; j < KC; j++) {
@@ -21,8 +21,8 @@ static inline void pack_A_panel(const float* A, float* pack_A, const size_t ic, 
     }
 }
 
-static inline void pack_B_panel(const float* B, float* pack_B, const size_t pc, const size_t jc,
-                                bool b_transposed, const size_t ldb, float alpha) {
+static inline void pack_B_panel(const float* restrict B, float* restrict pack_B, const size_t pc,
+                                const size_t jc, bool b_transposed, const size_t ldb, float alpha) {
     if (b_transposed) {
         for (size_t i = 0; i < KC; i++) {
             for (size_t j = 0; j < NC; j++) {
@@ -33,14 +33,17 @@ static inline void pack_B_panel(const float* B, float* pack_B, const size_t pc, 
         for (size_t i = 0; i < KC; i++) {
             memcpy(pack_B + NC * i, B + (pc + i) * ldb + jc, NC * sizeof(float));
         }
-        for (size_t i = 0; i < KC * NC; i++) {
-            pack_B[i] *= alpha;
+        if (alpha != 1.f) {
+            for (size_t i = 0; i < KC * NC; i++) {
+                pack_B[i] *= alpha;
+            }
         }
     }
 }
 
-static inline void pack_A_panel_tail(const float* A, float* pack_A, size_t ic, size_t pc, size_t mb,
-                                     size_t kb, bool a_transposed, size_t lda) {
+static inline void pack_A_panel_tail(const float* restrict A, float* restrict pack_A, size_t ic,
+                                     size_t pc, size_t mb, size_t kb, bool a_transposed,
+                                     size_t lda) {
     memset(pack_A, 0, MC * KC * sizeof(float));
 
     if (!a_transposed) {
@@ -56,16 +59,19 @@ static inline void pack_A_panel_tail(const float* A, float* pack_A, size_t ic, s
     }
 }
 
-static inline void pack_B_panel_tail(const float* B, float* pack_B, size_t pc, size_t jc, size_t kb,
-                                     size_t nb, bool b_transposed, size_t ldb, float alpha) {
+static inline void pack_B_panel_tail(const float* restrict B, float* restrict pack_B, size_t pc,
+                                     size_t jc, size_t kb, size_t nb, bool b_transposed, size_t ldb,
+                                     float alpha) {
     memset(pack_B, 0, KC * NC * sizeof(float));
 
     if (!b_transposed) {
         for (size_t k = 0; k < kb; ++k) {
             memcpy(pack_B + k * NC, B + (pc + k) * ldb + jc, nb * sizeof(float));
         }
-        for (size_t i = 0; i < KC * NC; i++) {
-            pack_B[i] *= alpha;
+        if (alpha != 1.f) {
+            for (size_t i = 0; i < KC * NC; i++) {
+                pack_B[i] *= alpha;
+            }
         }
     } else {
         for (size_t k = 0; k < kb; ++k) {
@@ -92,10 +98,9 @@ static inline void scale_C(float* C, size_t M, size_t N, size_t ldc, float beta)
     }
 }
 
-void gemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K,
-          const bool a_transposed, const bool b_transposed, const float alpha, const float beta,
-          const size_t lda, const size_t ldb, const size_t ldc) {
-
+void pml_sgemm(const float* A, const float* B, float* C, size_t M, size_t N, size_t K,
+               const bool a_transposed, const bool b_transposed, const float alpha,
+               const float beta, const size_t lda, const size_t ldb, const size_t ldc) {
     scale_C(C, M, N, ldc, beta);
 
 #pragma omp parallel

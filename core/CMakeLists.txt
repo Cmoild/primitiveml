@@ -15,6 +15,7 @@ add_library(pml_core
     src/gemm.c
     src/gemm_microkernel_avx2.S
     src/gemm_microkernel6x16_avx2.S
+    src/gemm_microkernel8x8_avx2.S
 )
 
 target_include_directories(pml_core

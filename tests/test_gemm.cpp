@@ -49,7 +49,7 @@ TEST_CASE("GEMM random correctness", "[gemm]") {
         C_ref[i] = 0.f;
     }
 
-    gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+    pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
     pml::matmul_kernel(A, B, C_ref, M, N, K);
 
     float err = max_diff(C, C_ref, M * N);
@@ -78,7 +78,7 @@ TEST_CASE("GEMM all ones", "[gemm]") {
     std::fill(C, C + M * N, 0.f);
     std::fill(C_ref, C_ref + M * N, 0.f);
 
-    gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+    pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
     pml::matmul_kernel(A, B, C_ref, M, N, K);
 
     float expected = (float)K;
@@ -111,7 +111,7 @@ TEST_CASE("GEMM sequential pattern", "[gemm]") {
     std::fill(C, C + M * N, 0.f);
     std::fill(C_ref, C_ref + M * N, 0.f);
 
-    gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+    pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
     pml::matmul_kernel(A, B, C_ref, M, N, K);
 
     float err = max_diff(C, C_ref, M * N);
@@ -140,7 +140,7 @@ TEST_CASE("GEMM edge-heavy sizes", "[gemm]") {
     std::fill(C, C + M * N, 0.f);
     std::fill(C_ref, C_ref + M * N, 0.f);
 
-    gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+    pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
     pml::matmul_kernel(A, B, C_ref, M, N, K);
 
     float err = max_diff(C, C_ref, M * N);
@@ -169,7 +169,7 @@ TEST_CASE("GEMM stress large", "[gemm][stress]") {
     std::fill(C, C + M * N, 0.f);
     std::fill(C_ref, C_ref + M * N, 0.f);
 
-    gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+    pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
     pml::matmul_kernel(A, B, C_ref, M, N, K);
 
     float err = max_diff(C, C_ref, M * N);

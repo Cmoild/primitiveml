@@ -7,10 +7,12 @@
 #include "../core/src/gemm_config.h"
 #include <cblas.h>
 
+const std::size_t num_of_runs = 100;
+
 int main() {
-    const std::size_t M = MC * 10;
+    const std::size_t M = 1440;
     const std::size_t N = NC * 10;
-    const std::size_t K = KC * 10;
+    const std::size_t K = 2560;
     std::cout << "M: " << M << std::endl;
     std::cout << "N: " << N << std::endl;
     std::cout << "K: " << K << std::endl;
@@ -24,28 +26,31 @@ int main() {
     float* C = (float*)std::malloc(M * N * 4);
 
     double all_time = 0.;
-    for (std::size_t i = 0; i < 10; i++) {
+    for (std::size_t i = 0; i < num_of_runs; i++) {
         auto start = std::chrono::high_resolution_clock::now();
-        gemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
+        pml_sgemm(A, B, C, M, N, K, false, false, 1.f, 0.f, K, N, N);
         auto end = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double, std::milli> elapsed = end - start;
-        std::cout << "GEMM: " << elapsed.count() << " ms" << std::endl;
+        std::cout << "\rGEMM (i = " << i << "): " << elapsed.count() << " ms" << std::flush;
         all_time += elapsed.count();
     }
-    std::cout << "Avg: " << all_time / 10 << " ms" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Avg: " << all_time / num_of_runs << " ms" << std::endl;
 
     all_time = 0.;
-    for (std::size_t i = 0; i < 10; i++) {
+    for (std::size_t i = 0; i < num_of_runs; i++) {
         auto start = std::chrono::high_resolution_clock::now();
         cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.f, A, K, B, N, 0.f, C, N);
         auto end = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double, std::milli> elapsed = end - start;
-        std::cout << "GEMM: " << elapsed.count() << " ms" << std::endl;
+        std::cout << "\rOpenBLAS SGEMM (i = " << i << "): " << elapsed.count() << " ms"
+                  << std::flush;
         all_time += elapsed.count();
     }
-    std::cout << "Avg: " << all_time / 10 << " ms" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Avg (OpenBLAS): " << all_time / num_of_runs << " ms" << std::endl;
 
     return 0;
 }

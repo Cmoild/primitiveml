@@ -34,7 +34,7 @@ template <> struct MatmulBackend<float> {
 #if defined(__x86_64__) && !defined(_WIN64)
         static const bool has_avx2_fma = avx2_fma_supported();
         if (has_avx2_fma) {
-            gemm(l, r, out, M, N, K, false, false, 1.f, 0.f, K, N, N);
+            pml_sgemm(l, r, out, M, N, K, false, false, 1.f, 0.f, K, N, N);
         } else {
             matmul_kernel(l, r, out, M, N, K);
         }
