@@ -100,7 +100,7 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
 template <typename T> void exp_kernel(const T*, T*, std::size_t) = delete;
 
 template <> inline void exp_kernel<float>(const float* o, float* res, std::size_t n) {
-#if defined(__x86_64__) && !defined(_WIN64)
+#if defined(__x86_64__)
     static const bool has_avx2_fma = avx2_fma_supported();
 
     if (has_avx2_fma) {

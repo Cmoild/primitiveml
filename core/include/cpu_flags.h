@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-bool avx2_fma_supported();
+bool __attribute__((sysv_abi)) avx2_fma_supported();
 
 #ifdef __cplusplus
 }

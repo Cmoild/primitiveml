@@ -4,8 +4,6 @@
 #include <math_kernels.h>
 #include <matmul.hpp>
 #include <chrono>
-#include "../core/src/gemm_config.h"
-#include <cblas.h>
 
 const std::size_t num_of_runs = 100;
 

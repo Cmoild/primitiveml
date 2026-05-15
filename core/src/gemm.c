@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <threads.h>
 #include "gemm_config.h"
+#include "gemm_microkernels_avx2.h"
 
 static inline void pack_A_panel(const float* restrict A, float* restrict pack_A, const size_t ic,
                                 const size_t jc, bool a_transposed, const size_t lda) {
@@ -132,6 +133,7 @@ void pml_sgemm(const float* A, const float* B, float* C, size_t M, size_t N, siz
                     }
 
                     if (mb == MC && nb == NC && kb == KC) {
+                        _Static_assert(MC % 6 == 0 && KC % 16 == 0 && NC % 16 == 0);
                         sgemm_microkernel6x16_avx2(pack_A, pack_B, C + ic * ldc + jc, ldc);
                     } else {
                         for (size_t i = 0; i < mb; ++i) {

@@ -13,7 +13,6 @@ add_library(pml_core
     src/exp_avx2_intrin.cpp
     src/cpu_flags.S
     src/gemm.c
-    src/gemm_microkernel_avx2.S
     src/gemm_microkernel6x16_avx2.S
     src/gemm_microkernel8x8_avx2.S
 )
@@ -24,9 +23,12 @@ target_include_directories(pml_core
 )
 
 target_link_libraries(pml_core
-    PRIVATE m
     PRIVATE OpenMP::OpenMP_C
 )
+
+if(NOT WIN32)
+    target_link_libraries(pml_core PRIVATE m)
+endif()
 
 if(BUILD_NUMPY_TESTS)
     set_target_properties(pml_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
