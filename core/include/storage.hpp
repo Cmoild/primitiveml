@@ -1,6 +1,5 @@
 #pragma once
 
-#include <alloca.h>
 #include <cstddef>
 #include <cstdlib>
 #include <source_location>

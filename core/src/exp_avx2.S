@@ -20,7 +20,9 @@
 
     .section .text
     .globl exp_avx2
+#ifdef __ELF__
     .type exp_avx2, @function
+#endif
     .p2align 4
 exp_avx2:
     xor %rax, %rax
@@ -105,4 +107,6 @@ exp_avx2:
 .Ltail_loop_end:
     vzeroupper
     ret
+#ifdef __ELF__
     .size exp_avx2, . - exp_avx2
+#endif

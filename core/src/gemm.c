@@ -2,10 +2,12 @@
 #include <memory.h>
 #include <stdlib.h>
 #include <omp.h>
-#include <stdio.h>
-#include <threads.h>
 #include "gemm_config.h"
 #include "gemm_microkernels_avx2.h"
+
+#ifdef _WIN64
+#include <malloc.h>
+#endif
 
 static inline void pack_A_panel(const float* restrict A, float* restrict pack_A, const size_t ic,
                                 const size_t jc, bool a_transposed, const size_t lda) {
@@ -106,9 +108,15 @@ void pml_sgemm(const float* A, const float* B, float* C, size_t M, size_t N, siz
 
 #pragma omp parallel
     {
+#ifndef _WIN64
         float* pack_A = aligned_alloc(64, MC * KC * sizeof(float));
         float* pack_B = aligned_alloc(64, KC * NC * sizeof(float));
         float* Cblk = (float*)aligned_alloc(64, MC * NC * sizeof(float));
+#else
+        float* pack_A = _aligned_malloc(MC * KC * sizeof(float), 64);
+        float* pack_B = _aligned_malloc(KC * NC * sizeof(float), 64);
+        float* Cblk = (float*)_aligned_malloc(MC * NC * sizeof(float), 64);
+#endif
 
 #pragma omp for schedule(static)
         for (size_t jc = 0; jc < N; jc += NC) {
@@ -156,8 +164,14 @@ void pml_sgemm(const float* A, const float* B, float* C, size_t M, size_t N, siz
             }
         }
 
+#ifndef _WIN64
         free(pack_A);
         free(pack_B);
         free(Cblk);
+#else
+        _aligned_free(pack_A);
+        _aligned_free(pack_B);
+        _aligned_free(Cblk);
+#endif
     }
 }

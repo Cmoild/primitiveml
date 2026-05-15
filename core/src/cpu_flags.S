@@ -1,7 +1,9 @@
     .section .text
 
     .globl avx2_fma_supported
+#ifdef __ELF__
     .type avx2_fma_supported, @function
+#endif
 avx2_fma_supported:
     push %rbx
     mov $0x01, %eax
@@ -55,4 +57,6 @@ avx2_fma_supported:
     pop %rbx
     mov $0, %rax
     ret
+#ifdef __ELF__
     .size avx2_fma_supported, . - avx2_fma_supported
+#endif

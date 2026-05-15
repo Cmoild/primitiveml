@@ -37,7 +37,9 @@
 
     .section .text
     .globl sgemm_microkernel8x8_avx2
+#ifdef __ELF__
     .type sgemm_microkernel8x8_avx2, @function
+#endif
 # const float* pack_A, const float* pack_B, float* C,
 # const size_t ldc
 sgemm_microkernel8x8_avx2:
@@ -137,4 +139,6 @@ sgemm_microkernel8x8_avx2:
 .LMR_loop_end:
     vzeroupper
     ret
+#ifdef __ELF__
     .size sgemm_microkernel8x8_avx2, . - sgemm_microkernel8x8_avx2
+#endif
