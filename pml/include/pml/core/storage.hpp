@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <source_location>
-#include <exceptions.hpp>
+#include <pml/core/exceptions.hpp>
 
 namespace pml {
 

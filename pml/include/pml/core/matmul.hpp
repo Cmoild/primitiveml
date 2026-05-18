@@ -2,10 +2,8 @@
 
 #include <cstddef>
 #include <stdexcept>
-#include <tensor.hpp>
-#include <tensor_iterator.hpp>
-#include <math_kernels.h>
-#include <cpu_flags.h>
+#include <pml/core/tensor.hpp>
+#include <pml/core/tensor_iterator.hpp>
 
 namespace pml {
 
@@ -31,16 +29,8 @@ template <typename T> struct MatmulBackend {
 template <> struct MatmulBackend<float> {
     static void run(const float* l, const float* r, float* out, std::size_t M, std::size_t N,
                     std::size_t K) {
-#if defined(__x86_64__)
-        static const bool has_avx2_fma = avx2_fma_supported();
-        if (has_avx2_fma) {
-            pml_sgemm(l, r, out, M, N, K, false, false, 1.f, 0.f, K, N, N);
-        } else {
-            matmul_kernel(l, r, out, M, N, K);
-        }
-#else
-        matmul_kernel(l, r, out, M, N, K);
-#endif
+        // FIXME: add header with declaration of pml_sgemm and link to the library
+        pml_sgemm(l, r, out, M, N, K, false, false, 1.f, 0.f, K, N, N);
     }
 };
 

@@ -1,6 +1,5 @@
 #include <math_kernels.h>
 #include <immintrin.h>
-#include <algorithm>
 
 void exp_avx2_intrin(float* operand, float* result, size_t n) {
     size_t i = 0;
@@ -72,7 +71,8 @@ void exp_avx2_intrin(float* operand, float* result, size_t n) {
         p = _mm_fmadd_ss(p, f, _mm_set_ss(1.0f));
 
         int ni = _mm_cvtss_si32(nf);
-        int exp = std::clamp(ni + 127, 0, 254);
+        int exp = (ni + 127 > 0) ? ni + 127 : 0;
+        exp = (exp < 254) ? exp : 254;
         __m128 pow2n = _mm_castsi128_ps(_mm_cvtsi32_si128(exp << 23));
 
         __m128 out = _mm_mul_ss(p, pow2n);

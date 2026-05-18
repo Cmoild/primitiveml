@@ -1,7 +1,7 @@
 #pragma once
 #include <concepts>
-#include <tensor.hpp>
-#include <tensor_iterator.hpp>
+#include <pml/core/tensor.hpp>
+#include <pml/core/tensor_iterator.hpp>
 
 namespace pml {
 

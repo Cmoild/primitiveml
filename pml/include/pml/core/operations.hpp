@@ -3,13 +3,11 @@
 #include <cstddef>
 #include <cmath>
 #include <concepts>
-#include <tensor.hpp>
-#include <tensor_iterator.hpp>
-#include <binary_elementwise_op.hpp>
-#include <reduction_op.hpp>
-#include <unary_elementwise_op.hpp>
-#include <cpu_flags.h>
-#include <math_kernels.h>
+#include <pml/core/tensor.hpp>
+#include <pml/core/tensor_iterator.hpp>
+#include <pml/core/binary_elementwise_op.hpp>
+#include <pml/core/reduction_op.hpp>
+#include <pml/core/unary_elementwise_op.hpp>
 
 namespace pml {
 
@@ -100,21 +98,8 @@ Tensor<T> sum(const Tensor<T>& operand, const std::size_t axis, const bool keep_
 template <typename T> void exp_kernel(const T*, T*, std::size_t) = delete;
 
 template <> inline void exp_kernel<float>(const float* o, float* res, std::size_t n) {
-#if defined(__x86_64__)
-    static const bool has_avx2_fma = avx2_fma_supported();
-
-    if (has_avx2_fma) {
-        exp_avx2(o, res, n);
-    } else {
-        for (std::size_t i = 0; i < n; ++i) {
-            res[i] = std::exp(o[i]);
-        }
-    }
-#else
-    for (std::size_t i = 0; i < n; ++i) {
-        res[i] = std::exp(o[i]);
-    }
-#endif
+    // FIXME: add kernel call
+    // pml_exp(o, res, n);
 }
 
 template <> inline void exp_kernel<double>(const double* o, double* res, std::size_t n) {

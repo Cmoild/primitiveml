@@ -1,4 +1,4 @@
-#include <tensor.hpp>
+#include <pml/core/tensor.hpp>
 #include <stdexcept>
 #include <vector>
 #include <memory>

@@ -1,27 +1,51 @@
 cmake_minimum_required(VERSION 3.31)
 project(primitiveml LANGUAGES C CXX)
 
-set(CMAKE_C_STANDARD 23)
-set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -mavx2 -mfma -g -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -g -fno-omit-frame-pointer")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -mavx2 -mfma -g -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g -fno-omit-frame-pointer")
+# find_package(pmlcompute REQUIRED)
 
-find_package(OpenMP REQUIRED)
+add_library(primitiveml STATIC
+    pml/src/tensor.cpp
+)
 
-add_subdirectory(core)
+target_include_directories(primitiveml
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/pml/include
+)
 
-file(GLOB MAIN_SRC_FILES ${CMAKE_SOURCE_DIR}/src/main.cpp)
-add_executable(primitiveml ${MAIN_SRC_FILES})
-target_link_libraries(primitiveml PRIVATE pml_core)
+function(set_warnings_and_build_flags target)
+    target_compile_options(${target} PRIVATE
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+        $<$<CONFIG:Debug>:-O0 -g>
+    )
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        target_compile_options(${target} PRIVATE
+            $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        )
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE
+            $<$<CONFIG:Release>:/O2 /DNDEBUG /Zi>
+            $<$<CONFIG:Debug>:/Od /Zi>
+        )
+    endif()
+endfunction()
+
+set_warnings_and_build_flags(primitiveml)
 
 if(NOT WIN32)
     target_link_libraries(primitiveml PRIVATE m)
 endif()
+
+add_executable(pml_app
+    examples/main.cpp
+)
+
+set_warnings_and_build_flags(pml_app)
+
+target_link_libraries(pml_app PRIVATE primitiveml)
 
 if (BUILD_CXX_TESTS)
     enable_testing()

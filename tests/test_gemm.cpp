@@ -2,7 +2,7 @@
 #include <cmath>
 #include <math_kernels.h>
 #include "../core/src/gemm_config.h"
-#include <matmul.hpp>
+#include <pml/core/matmul.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 static inline float rand_f() {

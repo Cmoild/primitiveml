@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <vector>
-#include <tensor.hpp>
+#include <pml/core/tensor.hpp>
 
 using Shape = std::vector<std::size_t>;
 using Strides = std::vector<std::size_t>;

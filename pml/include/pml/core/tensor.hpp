@@ -10,8 +10,8 @@
 #include <algorithm>
 #include <numeric>
 #include <concepts>
-#include <slice.hpp>
-#include <storage.hpp>
+#include <pml/core/slice.hpp>
+#include <pml/core/storage.hpp>
 
 namespace pml {
 

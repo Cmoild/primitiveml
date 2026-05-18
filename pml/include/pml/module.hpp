@@ -1,6 +1,6 @@
 #pragma once
 
-#include <tensor.hpp>
+#include <pml/core/tensor.hpp>
 #include <iostream>
 
 namespace pml::nn {

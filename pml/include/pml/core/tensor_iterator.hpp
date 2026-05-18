@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include <stdexcept>
-#include <tensor.hpp>
+#include <pml/core/tensor.hpp>
 #include <numeric>
 
 namespace pml {
